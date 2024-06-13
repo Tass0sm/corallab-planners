@@ -46,6 +46,7 @@ environments:
       - pypi: git+https://github.com/corallab-base/assets.git@9e093532809c99f625ca89dd575728d47289a214
       - pypi: https://files.pythonhosted.org/packages/5b/11/1e78951465b4a225519b8c3ad29769c49e0d8d157a070f681d5b6d64737f/certifi-2024.6.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3d/09/d82fe4a34c5f0585f9ea1df090e2a71eb9bb1e469723053e1ee9f57c16f3/charset_normalizer-3.3.2-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/a1/68/9be740ebdbce3186fe60ee664949db9ceac640eec4363f653227a25bac23/cholespy-1.0.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/96/43/dae06432d0c4b1dc9e9149ad37b4ca8384cf6eb7700cd9215b177b914f0a/cloudpickle-3.0.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8e/71/7f20855592cc929bc206810432b991ec4c702dc26b0567b132e52c85536f/contourpy-1.1.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl
@@ -105,6 +106,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/20/38/f5c473fe9b90c8debdd29ea68d5add0289f1936d6f923b6b9cc0b931194c/zipp-3.19.2-py3-none-any.whl
       - pypi: .
       - pypi: ../corallab-lib
+      - pypi: ../mp_baselines
       - pypi: ../torch_robotics
 packages:
 - kind: conda
@@ -196,6 +198,12 @@ packages:
   sha256: 45485e01ff4d3630ec0d9617310448a8702f70e9c01906b0d0118bdf9d124cf2
   requires_python: '>=3.7.0'
 - kind: pypi
+  name: cholespy
+  version: 1.0.0
+  url: https://files.pythonhosted.org/packages/a1/68/9be740ebdbce3186fe60ee664949db9ceac640eec4363f653227a25bac23/cholespy-1.0.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+  sha256: e5b2c1ba775637622d0c8562a227fb65aecb149768fbdaf7ab0773b5c03f8fa1
+  requires_python: '>=3.8'
+- kind: pypi
   name: cloudpickle
   version: 3.0.0
   url: https://files.pythonhosted.org/packages/96/43/dae06432d0c4b1dc9e9149ad37b4ca8384cf6eb7700cd9215b177b914f0a/cloudpickle-3.0.0-py3-none-any.whl
@@ -234,7 +242,7 @@ packages:
   name: corallab-lib
   version: 0.1.0
   path: ../corallab-lib
-  sha256: cce1186a723070bddd5cf7d281a0db433e4a0d2d02cf721fdcdf020abe000a86
+  sha256: 73d9f24ac0a2dde4af2a0478374d844c24f71ce00bad4f33fb2e64872b31ad75
   requires_dist:
   - corallab-assets @ git+https://github.com/corallab-base/assets.git@0.2.2
   - pygame
@@ -248,7 +256,7 @@ packages:
   name: corallab-planners
   version: 0.1.0
   path: .
-  sha256: f5b5557228e08e91b1552d8bea95ef2f8268e500249bb00cd247b7773e987241
+  sha256: d0aa2f666154a65629128041980f473a0c2f5f0918232eb035d10b0c4deb6e73
   requires_dist:
   - corallab-assets @ git+https://github.com/corallab-base/assets.git@0.2.2
   requires_python: '>=3.8,<3.9'
@@ -1094,6 +1102,17 @@ packages:
   - pytest-cov<3.0,>=2.5.1 ; extra == 'test'
   - pytest<4.0,>=3.0.0 ; extra == 'test'
   - requests<3.0,>=2.8.1 ; extra == 'test'
+- kind: pypi
+  name: mp-baselines
+  version: 0.1.0
+  path: ../mp_baselines
+  sha256: c448d7c0356fc44a15030d4955d7b7026d294bfc028ed7825088184c07e28ea8
+  requires_dist:
+  - cholespy>=1.0.0,<2.0.0
+  - matplotlib>=3,<4
+  - numpy>=1.22
+  requires_python: '>=3.8'
+  editable: true
 - kind: pypi
   name: mpmath
   version: 1.3.0

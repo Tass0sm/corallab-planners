@@ -1,1 +1,1 @@
-backend_list = ["ompl"]
+backend_list = ["ompl", "mp_baselines"]

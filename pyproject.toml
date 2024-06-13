@@ -18,6 +18,7 @@ platforms = ["linux-64"]
 corallab-planners = { path = ".", editable = true }
 corallab-lib = { path = "../corallab-lib", editable = true }
 torch_robotics = { path = "../torch_robotics", editable = true }
+mp-baselines = { path = "../mp_baselines", editable = true }
 pyplusplus = "*"
 
 [tool.pixi.tasks]
