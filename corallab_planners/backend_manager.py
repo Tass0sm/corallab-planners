@@ -1,5 +1,6 @@
 from .backends import backend_list
 import importlib
+import types
 
 
 class BackendManager:
@@ -15,13 +16,16 @@ class BackendManager:
     def get_backend(self, backend=None):
         assert backend or self.backend is not None, "Need to select a backend!"
 
-        try:
-            return importlib.import_module(
-                "." + (backend or self.backend),
-                package="corallab_planners.backends"
-            )
-        except KeyError:
-            raise Exception("Backend not found!")
+        if isinstance(backend, types.ModuleType):
+            return backend
+        else:
+            try:
+                return importlib.import_module(
+                    "." + (backend or self.backend),
+                    package="corallab_planners.backends"
+                )
+            except KeyError:
+                raise Exception("Backend not found!")
 
     def get_backend_attr(self, attr, backend=None):
         backend_module = self.get_backend(backend=backend)
