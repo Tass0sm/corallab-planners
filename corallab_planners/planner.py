@@ -14,13 +14,13 @@ class Planner:
         )
 
         if from_impl:
-            self.robot_impl = PlannerImpl.from_impl(from_impl, *args, **kwargs)
+            self.planner_impl = PlannerImpl.from_impl(from_impl, *args, **kwargs)
         else:
-            self.robot_impl = PlannerImpl(*args, **kwargs)
+            self.planner_impl = PlannerImpl(*args, **kwargs)
 
     def __getattr__(self, name):
-        if hasattr(self.robot_impl, name):
-            return getattr(self.robot_impl, name)
+        if hasattr(self.planner_impl, name):
+            return getattr(self.planner_impl, name)
         else:
             # Default behaviour
             raise AttributeError
