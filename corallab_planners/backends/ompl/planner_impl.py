@@ -90,6 +90,7 @@ class OMPLPlanner(PlannerInterface):
         # if self.simplify_solution:
         #     self.ps = og.PathSimplifier(self.si)
 
+        self.planner_name = planner_name
         self.set_planner(planner_name)
 
     def set_planner(self, planner_name):
@@ -120,6 +121,7 @@ class OMPLPlanner(PlannerInterface):
             self,
             start,
             goal,
+            **kwargs,
     ):
         # set the start and goal states;
         s = ob.State(self.space)
@@ -152,6 +154,9 @@ class OMPLPlanner(PlannerInterface):
             sol_path_list = [self.state_to_list(state) for state in sol_path_states]
             sol_path_arr = np.array(sol_path_list)
 
+            # iters, batches, horizon, q_dim
+            sol_path_arr = sol_path_arr.reshape((1, 1, *sol_path_arr.shape))
+
         else:
             return None
 
@@ -171,3 +176,6 @@ class OMPLPlanner(PlannerInterface):
 
     def render(self, ax, **kwargs):
         pass
+
+    def reset(self):
+        self.ss.clear()

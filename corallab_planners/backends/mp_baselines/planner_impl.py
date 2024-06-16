@@ -37,28 +37,57 @@ class MPBaselinesPlanner(PlannerInterface):
             **kwargs
     ):
         q_dim = task.get_q_dim()
-        tmp_start_state = torch.zeros((q_dim,))
-        tmp_goal_state = torch.zeros((q_dim,))
-        tmp_multi_goal_states = torch.zeros((1, q_dim))
+        tmp_start_state = torch.zeros((2 * q_dim,))
+        tmp_start_state_pos = torch.zeros((q_dim,))
+        tmp_goal_state = torch.zeros((2 * q_dim,))
+        tmp_goal_state_pos = torch.zeros((q_dim,))
 
         task_impl = task.task_impl.task_impl
 
         PlannerClass = mp_baselines_planners[planner_name]
+
         self.planner_impl = PlannerClass(
             task=task_impl,
-            start_state_pos=tmp_start_state,
-            goal_state_pos=tmp_goal_state,
-            # multi_goal_states=tmp_multi_goal_states,
+
+            start_state=tmp_start_state,
+            start_state_pos=tmp_start_state_pos,
+
+            goal_state=tmp_goal_state,
+            goal_state_pos=tmp_goal_state_pos,
+            multi_goal_states=tmp_goal_state.unsqueeze(0),
+
             tensor_args=tensor_args,
             **kwargs,
         )
+
+    @property
+    def name(self):
+        return f"mp_baselines_{self.planner_impl.name}"
+
+    @property
+    def n_support_points(self):
+        return self.planner_impl.n_support_points
+
+    @property
+    def dt(self):
+        return self.planner_impl.dt
 
     def solve(
             self,
             start,
             goal,
+            # return_iterations=True,
             **kwargs
     ):
         self.planner_impl.start_state_pos = start
         self.planner_impl.goal_state_pos = goal
-        return self.planner_impl.optimize(**kwargs)
+        self.planner_impl.multi_goal_states = goal.unsqueeze(0)
+        self.planner_impl.reset()
+
+        solution = self.planner_impl.optimize(**kwargs)
+
+        # TODO: Decide on API
+        return solution.unsqueeze(0).unsqueeze(0)
+
+    def reset(self):
+        self.planner_impl.reset()
