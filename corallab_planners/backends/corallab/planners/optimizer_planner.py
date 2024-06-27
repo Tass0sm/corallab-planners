@@ -37,9 +37,13 @@ class OptimizerPlanner:
             self,
             start,
             goal,
-            # return_iterations=True,
+            objective=None,
             **kwargs
     ):
-        initial_solution = self.planner.solve(start, goal, **kwargs)
-        refined_solution = self.optimizer.optimize(guess=initial_solution)
-        return refined_solution
+        initial_solution, planner_info = self.planner.solve(start, goal, **kwargs)
+        refined_solution, optimizer_info = self.optimizer.optimize(
+            guess=initial_solution,
+            objective=objective
+        )
+        info = dict(**planner_info, **optimizer_info)
+        return refined_solution, info

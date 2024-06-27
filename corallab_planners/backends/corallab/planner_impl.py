@@ -23,7 +23,7 @@ class CorallabPlanner(PlannerInterface):
 
     @property
     def name(self):
-        return f"TMP"
+        return f"corallab_{self.planner_impl.name}"
 
     def solve(
             self,
