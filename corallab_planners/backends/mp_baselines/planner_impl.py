@@ -36,17 +36,19 @@ class MPBaselinesPlanner(PlannerInterface):
             tensor_args : dict = DEFAULT_TENSOR_ARGS,
             **kwargs
     ):
-        q_dim = task.get_q_dim()
-        tmp_start_state = torch.zeros((2 * q_dim,))
-        tmp_start_state_pos = torch.zeros((q_dim,))
-        tmp_goal_state = torch.zeros((2 * q_dim,))
-        tmp_goal_state_pos = torch.zeros((q_dim,))
+        n_dof = task.get_q_dim()
+
+        tmp_start_state = torch.zeros((2 * n_dof,))
+        tmp_start_state_pos = torch.zeros((n_dof,))
+        tmp_goal_state = torch.zeros((2 * n_dof,))
+        tmp_goal_state_pos = torch.zeros((n_dof,))
 
         task_impl = task.task_impl.task_impl
 
         PlannerClass = mp_baselines_planners[planner_name]
 
         self.planner_impl = PlannerClass(
+            n_dof=n_dof,
             task=task_impl,
 
             start_state=tmp_start_state,
@@ -76,18 +78,25 @@ class MPBaselinesPlanner(PlannerInterface):
             self,
             start,
             goal,
-            # return_iterations=True,
             **kwargs
     ):
+        self.planner_impl.start_state = start
         self.planner_impl.start_state_pos = start
+        self.planner_impl.goal_state = goal
         self.planner_impl.goal_state_pos = goal
         self.planner_impl.multi_goal_states = goal.unsqueeze(0)
         self.planner_impl.reset()
 
         solution = self.planner_impl.optimize(**kwargs)
+        info = {}
 
-        # TODO: Decide on API
-        return solution.unsqueeze(0).unsqueeze(0)
+        if solution is None:
+            return solution, info
+
+        if solution.ndim == 3:
+            return solution, info
+        elif solution.ndim == 2:
+            return solution.unsqueeze(0), info
 
     def reset(self):
         self.planner_impl.reset()
