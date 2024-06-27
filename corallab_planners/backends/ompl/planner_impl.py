@@ -6,6 +6,7 @@ from ompl import util as ou
 from ompl import base as ob
 from ompl import geometric as og
 
+from corallab_planners.multi_processing import MultiProcessor
 from ..planner_interface import PlannerInterface
 
 
@@ -44,9 +45,11 @@ class OMPLPlanner(PlannerInterface):
             task : Task = None,
 
             allowed_time: float = DEFAULT_PLANNING_TIME,
-            # simplify_solution: bool = False,
-            # interpolate_solution: bool = False,
-            # interpolate_num: int = 64,
+            simplify_solution: bool = False,
+            interpolate_solution: bool = True,
+            interpolate_num: int = 64,
+
+            seed : int = 0,
 
             # Sampler
             # ValidStateSamplerOverride = None,
@@ -59,9 +62,10 @@ class OMPLPlanner(PlannerInterface):
         self.q_dim = task.get_q_dim()
 
         self.allowed_time = allowed_time
-        # self.simplify_solution = simplify_solution
-        # self.interpolate_solution = simplify_solution
-        # self.interpolate_num = interpolate_num
+        self.simplify_solution = simplify_solution
+        self.interpolate_solution = simplify_solution
+        self.interpolate_num = interpolate_num
+        self.seed = seed
 
         # OMPL Objects
         self.space = StateSpace(self.q_dim)
@@ -87,8 +91,8 @@ class OMPLPlanner(PlannerInterface):
         #         ob.ValidStateSamplerAllocator(allocValidStateSampler)
         #     )
 
-        # if self.simplify_solution:
-        #     self.ps = og.PathSimplifier(self.si)
+        if self.simplify_solution:
+            self.ps = og.PathSimplifier(self.si)
 
         self.planner_name = planner_name
         self.set_planner(planner_name)
@@ -99,7 +103,7 @@ class OMPLPlanner(PlannerInterface):
         elif planner_name == "RRT":
             self.planner = og.RRT(self.ss.getSpaceInformation())
         elif planner_name == "RRTConnect":
-            self.planner = og.RRTConnect(self.ss.getSpaceInformation())
+            self.planner = og.RRTConnect(self.ss.getSpaceInformation(), addIntermediateStates=True)
         elif planner_name == "RRTstar":
             self.planner = og.RRTstar(self.ss.getSpaceInformation())
         elif planner_name == "EST":
@@ -108,6 +112,8 @@ class OMPLPlanner(PlannerInterface):
             self.planner = og.FMT(self.ss.getSpaceInformation())
         elif planner_name == "BITstar":
             self.planner = og.BITstar(self.ss.getSpaceInformation())
+        elif planner_name == "STRIDE":
+            self.planner = og.STRIDE(self.ss.getSpaceInformation())
         else:
             print("{} not recognized, please add it first".format(planner_name))
             return
@@ -121,8 +127,12 @@ class OMPLPlanner(PlannerInterface):
             self,
             start,
             goal,
+            n_trajectories=1,
             **kwargs,
     ):
+
+        info = {}
+
         # set the start and goal states;
         s = ob.State(self.space)
         g = ob.State(self.space)
@@ -132,31 +142,47 @@ class OMPLPlanner(PlannerInterface):
 
         self.ss.setStartAndGoalStates(s, g)
 
+        sol_l = []
+
+        # solve in sequence
+        for _ in range(n_trajectories):
+            self.reset()
+
+            sol = self._get_single_solution()
+
+            if not self.ss.haveExactSolutionPath():
+                print("Did not find exact solution")
+
+            sol_l.append(sol)
+
+        # sols = np.concatenate(sol_l)
+        return sol_l, info
+
+    def _get_single_solution(self):
         # attempt to solve the problem within allowed planning time
         solved = self.ss.solve(self.allowed_time)
-        res = False
         sol_path_list = []
+
         if solved:
             # print("Found solution: interpolating into {} segments".format(INTERPOLATE_NUM))
             # print the path to screen
             sol_path_geometric = self.ss.getSolutionPath()
 
-            # if self.interpolate_solution:
-            #     sol_path_geometric.interpolate(self.interpolate_num)
+            if self.interpolate_solution:
+                sol_path_geometric.interpolate(self.interpolate_num)
 
-            # if self.simplify_solution:
-            #     self.ps.simplify(sol_path_geometric, self.allowed_time)
+            if self.simplify_solution:
+                self.ps.simplify(sol_path_geometric, self.allowed_time)
 
-            # if self.interpolate_solution:
-            #     sol_path_geometric.interpolate(self.interpolate_num)
+            if self.interpolate_solution:
+                sol_path_geometric.interpolate(self.interpolate_num)
 
             sol_path_states = sol_path_geometric.getStates()
             sol_path_list = [self.state_to_list(state) for state in sol_path_states]
             sol_path_arr = np.array(sol_path_list)
 
             # iters, batches, horizon, q_dim
-            sol_path_arr = sol_path_arr.reshape((1, 1, *sol_path_arr.shape))
-
+            sol_path_arr = sol_path_arr.reshape((1, *sol_path_arr.shape))
         else:
             return None
 
