@@ -6,7 +6,7 @@ import torch
 from corallab_lib import Task
 
 from corallab_planners.backends.corallab.planners.utils import extend_path
-from .utils import Roadmap, SearchNode, to_tuple
+from .utils import Roadmap, SearchNode, to_tuple, a_star
 
 from heapq import heappop, heappush
 from collections import deque
@@ -76,41 +76,9 @@ class PRM:
         q1 = start
         q2 = goal
 
-        self.grow_roadmap(samples=[q1, q2])
+        self.grow_roadmap_with_samples([q1, q2])
 
-        if q1 not in self.roadmap or q2 not in self.roadmap:
-            return None, {}
-
-        # A* ?
-        start, goal = self.roadmap[q1], self.roadmap[q2]
-        heuristic = lambda v: self.distance_fn(v.q, goal.q)  # lambda v: 0
-
-        queue = [(heuristic(start), start)]
-        nodes, processed = {start: SearchNode(0, None)}, set()
-
-        def retrace(v):
-            if nodes[v].parent is None:
-                return [v.q]
-
-            v.edges[nodes[v].parent].in_shortest_path = True
-            return retrace(nodes[v].parent) + v.edges[nodes[v].parent].path(nodes[v].parent)
-
-        while len(queue) != 0:
-            _, cv = heappop(queue)
-            if cv in processed:
-                continue
-            processed.add(cv)
-
-            if cv == goal:
-                return retrace(cv), {}
-
-            for nv in cv.edges:
-                cost = nodes[cv].cost + self.distance_fn(cv.q, nv.q)
-                if (nv not in nodes) or (cost < nodes[nv].cost):
-                    nodes[nv] = SearchNode(cost, cv)
-                    heappush(queue, (cost + heuristic(nv), nv))
-
-        return None, {}
+        return a_star(self, q1, q2)
 
     def render(self, ax, **kwargs):
         self.roadmap.draw(ax)
@@ -140,6 +108,11 @@ class PRM:
             for v in vertices:
                 self.add_milestone(v)
 
+    def grow_roadmap_with_samples(self, samples):
+        vertices = self.roadmap.add(samples)
+        for v in vertices:
+            self.add_milestone(v)
+
     def expand_roadmap(self, allowed_time):
         vertices = list(self.roadmap.vertices.values())
         weights = list(map(lambda v: (v.total_connection_attempts - v.successful_connection_attempts) / v.total_connection_attempts, vertices))
@@ -162,7 +135,7 @@ class PRM:
                     self.roadmap.connect(v1, v2)
 
     def _random_bounce_motion(self, start_q):
-        target_states, _ = self.task.random_q(n_samples=self.max_random_bounce_steps)
+        target_states = self.task.random_q(n_samples=self.max_random_bounce_steps)
         bounce_points = []
         prev = start_q;
         last_valid = prev
@@ -246,8 +219,8 @@ class PRM:
 
     def distance_fn(self, q1, q2):
         # TODO: cleanup
-        return self.task.task_impl.task_impl.distance_q(q1, q2).item()
+        return self.task.distance_q(q1, q2).item()
 
     def collision_fn(self, qs, **observation):
         # TODO: clean
-        return self.task.task_impl.task_impl.compute_collision(qs, margin=0).squeeze()
+        return self.task.compute_collision(qs).squeeze()

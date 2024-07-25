@@ -144,6 +144,18 @@ class Roadmap(Mapping, object):
 
         return new_vertices
 
+    def add_or_get(self, samples):
+        vertices = []
+        for q in samples:
+            key = to_tuple(q)
+            if key not in self:
+                self.vertices[key] = Vertex(q)
+                vertices.append(self[key])
+            else:
+                vertices.append(self[key])
+
+        return vertices
+
     def connect(self, v1, v2, path=None):
         if v1 not in v2.edges:  # TODO - what about parallel edges?
             edge = Edge(v1, v2, path)
@@ -171,3 +183,45 @@ class Roadmap(Mapping, object):
         new_roadmap.edges = list(
             flatten(roadmap.edges for roadmap in roadmaps))
         return new_roadmap
+
+
+def a_star(prm, q1, q2):
+    if q1 not in prm.roadmap or q2 not in prm.roadmap:
+        return None, {}
+
+    # A*
+    start, goal = prm.roadmap[q1], prm.roadmap[q2]
+    heuristic = lambda v: prm.distance_fn(v.q, goal.q)  # lambda v: 0
+
+    queue = [(heuristic(start), start)]
+    nodes, processed = {start: SearchNode(0, None)}, set()
+    solution_l = None
+
+    def retrace(v):
+        if nodes[v].parent is None:
+            return [v.q]
+
+        v.edges[nodes[v].parent].in_shortest_path = True
+        return retrace(nodes[v].parent) + v.edges[nodes[v].parent].path(nodes[v].parent)
+
+    while len(queue) != 0:
+        _, cv = heappop(queue)
+        if cv in processed:
+            continue
+        processed.add(cv)
+
+        if cv == goal:
+            solution_l = retrace(cv)
+            break
+
+        for nv in cv.edges:
+            cost = nodes[cv].cost + prm.distance_fn(cv.q, nv.q)
+            if (nv not in nodes) or (cost < nodes[nv].cost):
+                nodes[nv] = SearchNode(cost, cv)
+                heappush(queue, (cost + heuristic(nv), nv))
+
+    if len(solution_l) == 0:
+        return None, {}
+    else:
+        solution = torch.stack(solution_l)
+        return solution, {}
