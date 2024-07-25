@@ -8,7 +8,7 @@ from mp_baselines.planners.gpmp2 import GPMP2
 from mp_baselines.planners.stomp import STOMP
 from mp_baselines.planners.costs.cost_functions import CostCollision, CostComposite, CostSmoothnessTest, CostSmoothnessCHOMP
 
-from torch_robotics.torch_utils.torch_utils import DEFAULT_TENSOR_ARGS, to_torch
+from torch_robotics.torch_utils.torch_utils import DEFAULT_TENSOR_ARGS, to_torch, tensor_linspace_v1
 from torch_robotics.trajectory.utils import smoothen_trajectory
 
 from ..optimizer_interface import OptimizerInterface
@@ -32,6 +32,7 @@ class MPBaselinesOptimizer(OptimizerInterface):
     ):
         n_dof = task.get_q_dim()
 
+        self.task = task
         self.tensor_args = tensor_args
 
         tmp_start_state = torch.zeros((2 * n_dof,))
@@ -75,18 +76,16 @@ class MPBaselinesOptimizer(OptimizerInterface):
 
         if isinstance(guess, list):
             initial_traj_pos_vel = self._handle_guess_list(guess)
-        else:
+        elif isinstance(guess, torch.Tensor):
+            guess_l = [x for x in guess]
+            initial_traj_pos_vel = self._handle_guess_list(guess)
+        elif isinstance(guess, np.ndarray):
             guess = to_torch(guess, **self.optimizer_impl.tensor_args)
+            guess_l = [x for x in guess]
+            initial_traj_pos_vel = self._handle_guess_list(guess)
+        else:
+            raise NotImplementedError
 
-            traj_pos, traj_vel = smoothen_trajectory(
-                guess[0],
-                n_support_points=self.optimizer_impl.n_support_points,
-                dt=self.optimizer_impl.dt,
-                set_average_velocity=True,
-                tensor_args=self.optimizer_impl.tensor_args
-            )
-            # Reshape for gpmp/sgpmp interface
-            initial_traj_pos_vel = torch.cat((traj_pos, traj_vel), dim=-1)
 
         if initial_traj_pos_vel.ndim == 2:
             initial_traj_pos_vel = initial_traj_pos_vel.unsqueeze(0)
