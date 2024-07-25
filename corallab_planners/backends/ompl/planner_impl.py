@@ -63,7 +63,7 @@ class OMPLPlanner(PlannerInterface):
 
         self.allowed_time = allowed_time
         self.simplify_solution = simplify_solution
-        self.interpolate_solution = simplify_solution
+        self.interpolate_solution = interpolate_solution
         self.interpolate_num = interpolate_num
         self.seed = seed
 
@@ -97,13 +97,17 @@ class OMPLPlanner(PlannerInterface):
         self.planner_name = planner_name
         self.set_planner(planner_name)
 
+    @property
+    def name(self):
+        return f"ompl_{self.planner_name}"
+
     def set_planner(self, planner_name):
         if planner_name == "PRM":
             self.planner = og.PRM(self.ss.getSpaceInformation())
         elif planner_name == "RRT":
             self.planner = og.RRT(self.ss.getSpaceInformation())
         elif planner_name == "RRTConnect":
-            self.planner = og.RRTConnect(self.ss.getSpaceInformation(), addIntermediateStates=True)
+            self.planner = og.RRTConnect(self.ss.getSpaceInformation())
         elif planner_name == "RRTstar":
             self.planner = og.RRTstar(self.ss.getSpaceInformation())
         elif planner_name == "EST":
@@ -114,11 +118,15 @@ class OMPLPlanner(PlannerInterface):
             self.planner = og.BITstar(self.ss.getSpaceInformation())
         elif planner_name == "STRIDE":
             self.planner = og.STRIDE(self.ss.getSpaceInformation())
+        elif planner_name == "AITStar":
+            self.planner = og.AITstar(self.ss.getSpaceInformation())
+        elif planner_name == "KPIECE1":
+            self.planner = og.KPIECE1(self.ss.getSpaceInformation())
         else:
             print("{} not recognized, please add it first".format(planner_name))
             return
 
-        if planner_name != "PRM":
+        if planner_name not in ["PRM", "AITStar"]:
             self.planner.setRange(1.0)
 
         self.ss.setPlanner(self.planner)
@@ -151,6 +159,7 @@ class OMPLPlanner(PlannerInterface):
             sol = self._get_single_solution()
 
             if not self.ss.haveExactSolutionPath():
+                info["failed"] = True
                 print("Did not find exact solution")
 
             sol_l.append(sol)
@@ -180,9 +189,6 @@ class OMPLPlanner(PlannerInterface):
             sol_path_states = sol_path_geometric.getStates()
             sol_path_list = [self.state_to_list(state) for state in sol_path_states]
             sol_path_arr = np.array(sol_path_list)
-
-            # iters, batches, horizon, q_dim
-            sol_path_arr = sol_path_arr.reshape((1, *sol_path_arr.shape))
         else:
             return None
 
@@ -190,7 +196,7 @@ class OMPLPlanner(PlannerInterface):
 
     def _is_state_valid(self, q):
         q_arr = np.array([q[i] for i in range(self.q_dim)])
-        in_collision = self.task.compute_collision(q_arr, margin=0.05).item()
+        in_collision = self.task.compute_collision(q_arr).item()
         # if no collision, its valid
         return not bool(in_collision)
 
