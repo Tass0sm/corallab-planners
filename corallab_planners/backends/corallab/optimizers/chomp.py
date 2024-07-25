@@ -54,6 +54,10 @@ class CHOMP:
         # Weight prior
         self.weight_prior_cost = weight_prior_cost
 
+    @property
+    def name(self):
+        return "chomp"
+
     @classmethod
     def _get_R_mat(
             cls,
