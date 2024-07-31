@@ -1,6 +1,6 @@
 import numpy as np
 
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem
 
 from ompl import util as ou
 from ompl import base as ob
@@ -42,7 +42,7 @@ class OMPLPlanner(PlannerInterface):
     def __init__(
             self,
             planner_name : str,
-            task : Task = None,
+            problem : MotionPlanningProblem = None,
 
             allowed_time: float = DEFAULT_PLANNING_TIME,
             simplify_solution: bool = False,
@@ -57,9 +57,9 @@ class OMPLPlanner(PlannerInterface):
             **kwargs
     ):
 
-        self.task = task
+        self.problem = problem
 
-        self.q_dim = task.get_q_dim()
+        self.q_dim = problem.get_q_dim()
 
         self.allowed_time = allowed_time
         self.simplify_solution = simplify_solution
@@ -70,8 +70,8 @@ class OMPLPlanner(PlannerInterface):
         # OMPL Objects
         self.space = StateSpace(self.q_dim)
 
-        min_q_bounds = (task.get_q_min() * 2).tolist()
-        max_q_bounds = (task.get_q_max() * 2).tolist()
+        min_q_bounds = (problem.get_q_min() * 2).tolist()
+        max_q_bounds = (problem.get_q_max() * 2).tolist()
         bounds = ob.RealVectorBounds(self.q_dim)
         joint_bounds = zip(min_q_bounds, max_q_bounds)
         for i, (lower_limit, upper_limit) in enumerate(joint_bounds):
@@ -196,7 +196,7 @@ class OMPLPlanner(PlannerInterface):
 
     def _is_state_valid(self, q):
         q_arr = np.array([q[i] for i in range(self.q_dim)])
-        in_collision = self.task.compute_collision(q_arr).item()
+        in_collision = self.problem.check_collision(q_arr).item()
         # if no collision, its valid
         return not bool(in_collision)
 

@@ -1,6 +1,6 @@
 import torch
 
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem
 
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import batched_weighted_dot_prod
@@ -11,7 +11,7 @@ class CHOMP:
 
     def __init__(
             self,
-            task : Task = None,
+            problem : MotionPlanningProblem = None,
             n_support_points : int = 64,
             dt : float = 0.4,
             opt_iters : int = 1,

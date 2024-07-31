@@ -1,4 +1,4 @@
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem
 
 from corallab_planners import Planner, Optimizer
 
@@ -6,7 +6,7 @@ from corallab_planners import Planner, Optimizer
 class RepeatPlanner:
     def __init__(
             self,
-            task : Task = None,
+            problem : MotionPlanningProblem = None,
 
             sub_planner : Planner = None,
             sub_planner_name : str = "RRTConnect",
@@ -17,7 +17,7 @@ class RepeatPlanner:
     ):
         self.planner = Planner(
             planner_name = sub_planner_name,
-            task = task,
+            problem = problem,
             **sub_planner_args,
             backend = sub_planner_backend,
         )

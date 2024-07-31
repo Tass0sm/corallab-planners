@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem
 
 from . import optimizers
 from ..optimizer_interface import OptimizerInterface
@@ -12,12 +12,12 @@ class CorallabOptimizer(OptimizerInterface):
     def __init__(
             self,
             optimizer_name : str,
-            task : Task = None,
+            problem : MotionPlanningProblem = None,
             **kwargs
     ):
         OptimizerClass = getattr(optimizers, optimizer_name)
         self.optimizer_impl = OptimizerClass(
-            task=task,
+            problem=problem,
             **kwargs
         )
 

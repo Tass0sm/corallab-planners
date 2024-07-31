@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem
 
 from mp_baselines.planners.chomp import CHOMP
 from mp_baselines.planners.gpmp2 import GPMP2
@@ -32,11 +32,11 @@ class MPBaselinesPlanner(PlannerInterface):
     def __init__(
             self,
             planner_name : str,
-            task : Task = None,
+            problem : MotionPlanningProblem = None,
             tensor_args : dict = DEFAULT_TENSOR_ARGS,
             **kwargs
     ):
-        n_dof = task.get_q_dim()
+        n_dof = problem.get_q_dim()
 
         tmp_start_state = torch.zeros((2 * n_dof,))
         tmp_start_state_pos = torch.zeros((n_dof,))

@@ -1,6 +1,6 @@
 import torch
 
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem
 
 from corallab_planners import Planner, Optimizer
 
@@ -8,7 +8,7 @@ from corallab_planners import Planner, Optimizer
 class OptimizerPlanner:
     def __init__(
             self,
-            task : Task = None,
+            problem : MotionPlanningProblem = None,
 
             initial_planner : Planner = None,
             initial_planner_name : str = "StraightLinePlanner",
@@ -21,18 +21,18 @@ class OptimizerPlanner:
             optimizer_args : dict = {},
             **kwargs
     ):
-        self.task = task
+        self.problem = problem
 
         self.initial_planner = Planner(
             planner_name = initial_planner_name,
-            task = task,
+            problem = problem,
             **initial_planner_args,
             backend = initial_planner_backend,
         )
 
         self.optimizer = Optimizer(
             optimizer_name = optimizer_name,
-            task = task,
+            problem = problem,
             **optimizer_args,
             backend = optimizer_backend,
         )
@@ -60,8 +60,8 @@ class OptimizerPlanner:
         )
 
         if "solution_iters" in planner_info and "solution_iters" in optimizer_info:
-            s_iters1 = self.task.robot.get_position(planner_info["solution_iters"])
-            s_iters2 = self.task.robot.get_position(optimizer_info["solution_iters"])
+            s_iters1 = self.problem.robot.get_position(planner_info["solution_iters"])
+            s_iters2 = self.problem.robot.get_position(optimizer_info["solution_iters"])
 
             s_iters = torch.cat([s_iters1, s_iters2])
 

@@ -1,7 +1,9 @@
 import torch
 import numpy as np
 
-from corallab_lib.task import Task
+from corallab_lib import MotionPlanningProblem, PebbleMotionProblem
+
+from typing import Union
 
 from . import planners
 from ..planner_interface import PlannerInterface
@@ -12,12 +14,12 @@ class CorallabPlanner(PlannerInterface):
     def __init__(
             self,
             planner_name : str,
-            task : Task = None,
+            problem : Union[MotionPlanningProblem, PebbleMotionProblem] = None,
             **kwargs
     ):
         PlannerClass = getattr(planners, planner_name)
         self.planner_impl = PlannerClass(
-            task=task,
+            problem=problem,
             **kwargs
         )
 
