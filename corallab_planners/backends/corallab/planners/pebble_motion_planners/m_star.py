@@ -12,8 +12,7 @@ from torch_robotics.torch_utils.torch_timer import TimerCUDA
 
 from corallab_lib import PebbleMotionProblem
 from corallab_lib.backends.corallab.roadmap import Roadmap
-
-from corallab_planners.backends.corallab.planners.implicit_graph import ImplicitGraph
+from corallab_lib.backends.corallab.implicit_graph import ImplicitGraph
 
 SearchNode = namedtuple('SearchNode', ['cost', 'parent'])
 

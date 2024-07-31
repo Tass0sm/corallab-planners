@@ -28,6 +28,7 @@ class MultiAgentPRMPlanner:
         self.n_subrobots = len(self.subrobots)
         self.unique_subrobots = []
         self.subrobot_to_unique_subrobot_map = {}
+        self.loaded_roadmaps = False
 
         j = 0
         for i, r in enumerate(self.subrobots):
@@ -71,6 +72,21 @@ class MultiAgentPRMPlanner:
 
         return states
 
+    def _add_subrobot_states_to_prm(self, joint_state):
+        states = []
+
+        for i, r in enumerate(self.subrobots):
+            j = self.subrobot_to_unique_subrobot_map[i]
+            subrobot_prm = self.prms[j]
+
+            subrobot_state = r.get_position(joint_state)
+            subrobot_prm.planner_impl.planner_impl.grow_roadmap_with_samples([subrobot_state])
+            states.append(subrobot_state)
+
+            joint_state = joint_state[r.get_n_dof():]
+
+        return states
+
     def _create_joint_solution(self, solutions, concatenate=False):
         solutions_l = list(solutions.values())
         max_length = max([sol.shape[0] for sol in solutions_l])
@@ -107,6 +123,20 @@ class MultiAgentPRMPlanner:
         )
 
         fig.show()
+
+    ##################################################
+
+    def load_roadmaps(self, filenames):
+        for prm, filename in zip(self.prms, filenames):
+            prm.planner_impl.planner_impl.load_roadmap(filename)
+
+        self.loaded_roadmaps = True
+
+    def save_roadmaps(self, filenames):
+        for prm, filename in zip(self.prms, filenames):
+            prm.planner_impl.planner_impl.save_roadmap(filename)
+
+    ##################################################
 
     def solve(
             self,

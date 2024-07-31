@@ -1,54 +1,9 @@
-import sys
-import argparse
-import yaml
-import math
-import torch
-import heapq
-import numpy as np
-import itertools
-from copy import copy
-
-from math import fabs
-from itertools import combinations
-from copy import deepcopy
-
-from corallab_planners.backends.corallab.planners.prm.utils import Roadmap
-from corallab_lib.backends.torch_robotics.env_impl import TorchRoboticsEnv
-
-from typing import Callable
-
+from corallab_lib.backends.corallab.implicit_graph import ImplicitGraph
 from corallab_lib import MotionPlanningProblem, PebbleMotionProblem
 
-import scipy.interpolate
-
-try:
-    from collections import Mapping, namedtuple
-except ImportError:
-    from collections.abc import Mapping, namedtuple
-
-from torch_robotics.torch_utils.torch_utils import DEFAULT_TENSOR_ARGS
-from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
-from torch_robotics.torch_utils.torch_timer import TimerCUDA
-
-
-
-import numpy as np
-import pylab as pl
-import time
-
-# from .tree import Tree
-from ..implicit_graph import ImplicitGraph
-from corallab_lib import MotionPlanningProblem
 from corallab_planners import Planner
 
-from collections import defaultdict
-
-import random
-
 from ..multi_agent_prm_planner import MultiAgentPRMPlanner
-
-
-SearchNode = namedtuple('SearchNode', ['cost', 'parent'])
 
 
 class M_STAR_MP(MultiAgentPRMPlanner):
@@ -68,8 +23,6 @@ class M_STAR_MP(MultiAgentPRMPlanner):
     ):
         super().__init__(problem=problem)
 
-        self.loaded_roadmaps = False
-
         self.n_iters = n_iters
         self.max_time = max_time
 
@@ -86,33 +39,6 @@ class M_STAR_MP(MultiAgentPRMPlanner):
     def _collision_fn(self, qs, **observation):
         return self.problem.check_collision(qs).squeeze()
 
-    def _add_subrobot_states_to_prm(self, joint_state):
-        states = []
-
-        for i, r in enumerate(self.subrobots):
-            j = self.subrobot_to_unique_subrobot_map[i]
-            subrobot_prm = self.prms[j]
-
-            subrobot_state = r.get_position(joint_state)
-            subrobot_prm.planner_impl.planner_impl.grow_roadmap_with_samples([subrobot_state])
-            states.append(subrobot_state)
-
-            joint_state = joint_state[r.get_n_dof():]
-
-        return states
-
-    ##################################################
-
-    def load_roadmaps(self, filenames):
-        for prm, filename in zip(self.prms, filenames):
-            prm.planner_impl.planner_impl.load_roadmap(filename)
-
-        self.loaded_roadmaps = True
-
-    def save_roadmaps(self, filenames):
-        for prm, filename in zip(self.prms, filenames):
-            prm.planner_impl.planner_impl.save_roadmap(filename)
-
     ##################################################
 
     def solve(
@@ -122,9 +48,6 @@ class M_STAR_MP(MultiAgentPRMPlanner):
             prm_construction_time : float = 5.0,
             **kwargs
     ):
-        # start = start.cpu().numpy() # .to(**self.problem.tensor_args)
-        # goal = goal.cpu().numpy() # .to(**self.problem.tensor_args)
-
         # Create subrobot PRM
         if not self.loaded_roadmaps:
             for prm in self.prms:
