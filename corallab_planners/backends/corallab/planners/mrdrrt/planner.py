@@ -119,20 +119,13 @@ class MRdRRT(MultiAgentPRMPlanner):
             self,
             start,
             goal,
-            prm_construction_time : float = 10.0,
             **kwargs
     ):
         """Main function for MRdRRT. Expands tree to find path from start to goal.
         Inputs: list of start and goal configs for robots.
         """
 
-        # Create subrobot PRM
-        if not self.loaded_roadmaps:
-            for prm in self.prms:
-                print("Constructing a PRM...")
-                prm.planner_impl.planner_impl.construct_roadmap(
-                    allowed_time=prm_construction_time
-                )
+        self.construct_roadmaps()
 
         # self._visualize_roadmap()
         # breakpoint()

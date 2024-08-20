@@ -11,7 +11,6 @@ from torch_robotics.environments.env_dense_2d import EnvDense2D
 from torch_robotics.environments.env_grid_circles_2d import EnvGridCircles2D
 from torch_robotics.environments.utils import create_grid_spheres
 from torch_robotics.robots.robot_point_mass import RobotPointMass
-from torch_robotics.tasks.tasks import PlanningTask
 from torch_robotics.torch_utils.seed import fix_random_seed
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 from torch_robotics.torch_utils.torch_utils import get_torch_device
@@ -21,7 +20,7 @@ from einops._torch_specific import allow_ops_in_compiled_graph  # requires einop
 allow_ops_in_compiled_graph()
 
 import corallab_lib
-from corallab_lib import Robot, Env, Task
+from corallab_lib import Robot, Env, MotionPlanningProblem
 
 import corallab_planners
 from corallab_planners import Planner
@@ -51,22 +50,10 @@ if __name__ == "__main__":
         tensor_args=tensor_args
     )
 
-    task = Task(
-        "PlanningTask",
+    problem = MotionPlanningProblem(
         robot=robot,
         env=env
     )
-
-    # task = PlanningTask(
-    #     env=env,
-    #     robot=robot,
-    #     # ws_limits=torch.tensor([[-0.85, -0.85], [0.95, 0.95]], **tensor_args),  # workspace limits
-    #     # use_occupancy_map=True,  # whether to create and evaluate collisions on an occupancy map
-    #     use_occupancy_map=False,
-    #     cell_size=0.01,
-    #     obstacle_cutoff_margin=0.005,
-    #     tensor_args=tensor_args
-    # )
 
     # -------------------------------- Planner ---------------------------------
     start_state = torch.tensor([-0.8, -0.8], **tensor_args)

@@ -77,6 +77,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/ff/74/a2e2be7fb83aaedec84f391f082cf765dfb635e7caa9b49065f73e4835d8/nvidia_cudnn_cu12-8.9.2.26-py3-none-manylinux1_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/86/94/eb540db023ce1d162e7bea9f8f5aa781d57c65aed513c33ee9a5123ead4d/nvidia_cufft_cu12-11.0.2.54-py3-none-manylinux1_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/44/31/4890b1c9abc496303412947fc7dcea3d14861720642b49e8ceed89636705/nvidia_curand_cu12-10.3.2.106-py3-none-manylinux1_x86_64.whl
+      - pypi: https://files.pythonhosted.org/packages/7d/94/1cf549446c89a78fc8f384aeb009bdf82e62c264d9a2ea584f59c1b78b39/Nvidia_curobo-0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/bc/1d/8de1e5c67099015c834315e333911273a8c6aaba78923dd1d1e25fc5f217/nvidia_cusolver_cu12-11.4.5.107-py3-none-manylinux1_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/65/5b/cfaeebf25cd9fdec14338ccb16f6b2c4c7fa9163aefcf057d86b9cc248bb/nvidia_cusparse_cu12-12.1.0.106-py3-none-manylinux1_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/4b/2a/0a131f572aa09f741c30ccd45a8e56316e8be8dfc7bc19bf0ab7cfef7b19/nvidia_nccl_cu12-2.20.5-py3-none-manylinux2014_x86_64.whl
@@ -242,21 +243,22 @@ packages:
   name: corallab-lib
   version: 0.1.0
   path: ../corallab-lib
-  sha256: 73d9f24ac0a2dde4af2a0478374d844c24f71ce00bad4f33fb2e64872b31ad75
+  sha256: 62e3cf0f9f0245628c219c5739fa09de7f670ac725f011b55f837656aa477670
   requires_dist:
   - corallab-assets @ git+https://github.com/corallab-base/assets.git@0.2.2
   - pygame
   - gymnasium
   - pybullet ; extra == 'pybullet'
   - pybullet-envs-gymnasium ; extra == 'pybullet'
-  - torch-robotics @ file:///home/tassos/phd/qureshi/first-project/torch_robotics ; extra == 'torch-robotics'
+  - torch-robotics ; extra == 'torch-robotics'
+  - nvidia-curobo ; extra == 'curobo'
   requires_python: '>=3.8,<3.9'
   editable: true
 - kind: pypi
   name: corallab-planners
   version: 0.1.0
   path: .
-  sha256: d0aa2f666154a65629128041980f473a0c2f5f0918232eb035d10b0c4deb6e73
+  sha256: 24796aaab002796263de301c786825210ddf2c005871faf3070e8e58bc39acd9
   requires_dist:
   - corallab-assets @ git+https://github.com/corallab-base/assets.git@0.2.2
   requires_python: '>=3.8,<3.9'
@@ -488,15 +490,15 @@ packages:
   - pygame>=2.1.3 ; extra == 'box2d'
   - swig==4.* ; extra == 'box2d'
   - pygame>=2.1.3 ; extra == 'classic-control'
-  - pygame>=2.1.3 ; extra == 'classic_control'
+  - pygame>=2.1.3 ; extra == 'classic-control'
   - jax>=0.4.0 ; extra == 'jax'
   - jaxlib>=0.4.0 ; extra == 'jax'
   - mujoco>=2.3.3 ; extra == 'mujoco'
   - imageio>=2.14.1 ; extra == 'mujoco'
   - mujoco-py<2.2,>=2.1 ; extra == 'mujoco-py'
   - cython<3 ; extra == 'mujoco-py'
-  - mujoco-py<2.2,>=2.1 ; extra == 'mujoco_py'
-  - cython<3 ; extra == 'mujoco_py'
+  - mujoco-py<2.2,>=2.1 ; extra == 'mujoco-py'
+  - cython<3 ; extra == 'mujoco-py'
   - lz4>=3.1.0 ; extra == 'other'
   - opencv-python>=3.0 ; extra == 'other'
   - matplotlib>=3.0 ; extra == 'other'
@@ -505,7 +507,7 @@ packages:
   - pytest==7.1.3 ; extra == 'testing'
   - scipy>=1.7.3 ; extra == 'testing'
   - pygame>=2.1.3 ; extra == 'toy-text'
-  - pygame>=2.1.3 ; extra == 'toy_text'
+  - pygame>=2.1.3 ; extra == 'toy-text'
   requires_python: '>=3.8'
 - kind: conda
   name: icu
@@ -1045,7 +1047,7 @@ packages:
   requires_dist:
   - cssselect>=0.7 ; extra == 'cssselect'
   - html5lib ; extra == 'html5'
-  - lxml-html-clean ; extra == 'html_clean'
+  - lxml-html-clean ; extra == 'html-clean'
   - beautifulsoup4 ; extra == 'htmlsoup'
   - cython>=3.0.10 ; extra == 'source'
   requires_python: '>=3.6'
@@ -1236,6 +1238,11 @@ packages:
   url: https://files.pythonhosted.org/packages/44/31/4890b1c9abc496303412947fc7dcea3d14861720642b49e8ceed89636705/nvidia_curand_cu12-10.3.2.106-py3-none-manylinux1_x86_64.whl
   sha256: 9d264c5036dde4e64f1de8c50ae753237c12e0b1348738169cd0f8a536c0e1e0
   requires_python: '>=3'
+- kind: pypi
+  name: nvidia-curobo
+  version: '0.1'
+  url: https://files.pythonhosted.org/packages/7d/94/1cf549446c89a78fc8f384aeb009bdf82e62c264d9a2ea584f59c1b78b39/Nvidia_curobo-0.1-py3-none-any.whl
+  sha256: ff0bb29972e1b6bbc09a40c282acd9d73bc8e365f7044418fc4a63bcf0ddb24d
 - kind: pypi
   name: nvidia-cusolver-cu12
   version: 11.4.5.107
@@ -1454,7 +1461,7 @@ packages:
   - urllib3<3,>=1.21.1
   - certifi>=2017.4.17
   - pysocks!=1.5.7,>=1.5.6 ; extra == 'socks'
-  - chardet<6,>=3.0.2 ; extra == 'use_chardet_on_py3'
+  - chardet<6,>=3.0.2 ; extra == 'use-chardet-on-py3'
   requires_python: '>=3.8'
 - kind: pypi
   name: scipy
@@ -1596,7 +1603,7 @@ packages:
   name: torch-robotics
   version: 0.1.0
   path: ../torch_robotics
-  sha256: 21c86d2624ead2b459b4213e383e09d012da4f9f563a88f3a16436ce3c8de3c2
+  sha256: 7a5f727b31bbdbcc658ea1a8fcf3d0c46e6c6eeea80501ab77db21ed7e1e47dc
   requires_dist:
   - einops>=0.7.0,<0.8.0
   - imageio>=2.33.0,<3.0.0
@@ -1606,7 +1613,7 @@ packages:
   - pyyaml>=6.0.1,<7.0.0
   - scipy>=1.10,<2.0
   - torch
-  - trimesh>=4.0.5,<5.0.0
+  - trimesh
   - urdf-parser-py>=0.0.4,<0.0.5
   requires_python: '>=3.8,<3.11'
   editable: true

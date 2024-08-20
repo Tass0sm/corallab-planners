@@ -1,10 +1,15 @@
+import math
 import torch
 
 from corallab_lib import MotionPlanningProblem
 
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
-from torch_robotics.torch_utils.torch_utils import batched_weighted_dot_prod
-from torch_robotics.torch_utils.torch_utils import DEFAULT_TENSOR_ARGS
+from torch_robotics.torch_utils.torch_utils import (
+    batched_weighted_dot_prod,
+    DEFAULT_TENSOR_ARGS,
+    tensor_linspace_v1,
+    to_torch
+)
 
 
 class CHOMP:
@@ -80,6 +85,62 @@ class CHOMP:
 
         return R_mat.to(**tensor_args)
 
+    def _interpolate_states(self, states):
+        request_count = self.n_support_points
+        states_l = [s for s in states]
+
+        if request_count < len(states) or len(states) < 2:
+            raise NotImplementedError
+
+        count = request_count;
+
+        # the remaining length of the path we need to add states along
+        remaining_length = states.diff(dim=0).square().sum(dim=-1).sqrt().sum()
+
+        # the new array of states this path will have
+        new_states = []
+        n1 = len(states_l) - 1;
+
+        for i in range(n1):
+            s1 = states_l[i];
+            s2 = states_l[i + 1];
+
+            new_states.append(s1)
+
+            # the maximum number of states that can be added on the current motion (without its endpoints)
+            # such that we can at least fit the remaining states
+            max_n_states = count + i - len(states_l)
+
+            if max_n_states > 0:
+                # compute an approximate number of states the following segment needs to contain; this includes endpoints
+                segment_length = torch.linalg.norm(s2 - s1)
+                ns = max_n_states + 2 if i + 1 == n1 else math.floor(0.5 + count * segment_length / remaining_length) + 1;
+
+                if ns > 2:
+                    if (ns - 2 > max_n_states):
+                        ns = max_n_states + 2
+
+                    segment_states = tensor_linspace_v1(
+                        s1, s2, steps=ns
+                    ).T
+                    segment_states = [s for s in segment_states[1:-1]]
+                    new_states.extend(segment_states)
+                    ns -= 2
+                else:
+                    ns = 0
+
+                # update what remains to be done
+                count -= (ns + 1)
+                remaining_length -= segment_length
+            else:
+                count -= 1
+
+        # add the last state
+        new_states.append(states_l[n1])
+        states = torch.stack(new_states)
+
+        return states
+
     def reset(
             self,
             initial_particle_means=None,
@@ -101,7 +162,16 @@ class CHOMP:
         if opt_iters is None:
             opt_iters = self.opt_iters
 
-        guess = torch.tensor(guess, **self.tensor_args)
+        guess = to_torch(guess, **self.tensor_args)
+
+        # if guess.ndim == 2:
+        #     guess = guess.unsqueeze(0)
+
+        # if guess.shape[1] <= self.n_support_points:
+        #     guess = self._interpolate_states(guess)
+
+
+
         self.reset(initial_particle_means=guess)
 
         solution_l = []

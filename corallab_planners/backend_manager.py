@@ -7,14 +7,22 @@ class BackendManager:
     def __init__(self):
         self.backend = None
         self.backend_kwargs = {}
+        self.backend_list = backend_list
+        self.backend_dict = {}
+
+    def register_backend(self, backend: str, module):
+        self.backend_dict[backend] = module
 
     def set_backend(self, backend: str, **backend_kwargs):
-        assert backend in backend_list
+        assert backend in self.backend_list
         self.backend = backend
         self.backend_kwargs = backend_kwargs
 
     def get_backend(self, backend=None):
         assert backend or self.backend is not None, "Need to select a backend!"
+
+        if backend in self.backend_dict:
+            return self.backend_dict[backend]
 
         if isinstance(backend, types.ModuleType):
             return backend

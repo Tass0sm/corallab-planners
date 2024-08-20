@@ -54,10 +54,13 @@ class OptimizerPlanner:
         if initial_solution is None:
             return None, {}
 
-        refined_solution, optimizer_info = self.optimizer.optimize(
-            guess=initial_solution,
-            objective=objective
-        )
+        try:
+            refined_solution, optimizer_info = self.optimizer.optimize(
+                guess=initial_solution,
+                objective=objective
+            )
+        except NotImplementedError:
+            refined_solution, optimizer_info = None, {}
 
         if "solution_iters" in planner_info and "solution_iters" in optimizer_info:
             s_iters1 = self.problem.robot.get_position(planner_info["solution_iters"])

@@ -1,7 +1,6 @@
 import abc
 import pickle
 
-import time
 import torch
 import numpy as np
 
@@ -63,7 +62,7 @@ class PRM:
 
         self.connect_distance = connect_distance
         self.max_random_bounce_steps = max_random_bounce_steps
-        self.construction_phase_time = 1
+        self.construction_phase_iters = 1
         self.max_retries = max_retries
         self.loaded_roadmap = False
 
@@ -71,7 +70,7 @@ class PRM:
         # self.bounce_max_dist = 0.8
 
         self.nn = NearestNeighbors()
-        self.roadmap = Roadmap()
+        self.roadmap = Roadmap(problem=self.problem)
         self.tensor_args = tensor_args
 
     def _visualize_roadmap(self):
@@ -140,36 +139,29 @@ class PRM:
     #############################################################
 
     def load_roadmap(self, filename):
-        with open(filename, 'rb') as f:
-            self.roadmap = pickle.load(f)
-
+        self.roadmap.load_from_pkl(filename)
         vertices_np = torch.stack([v.q for v in self.roadmap.vertices.values()]).cpu().numpy()
         self.nn.add_points(vertices_np)
         self.loaded_roadmap = True
 
     def save_roadmap(self, filename):
-        with open(filename, 'wb') as f:
-            pickle.dump(self.roadmap, f)
+        self.roadmap.save_to_pkl(filename)
 
     #############################################################
 
-    def construct_roadmap(self, allowed_time : float = 15.0):
-        grow = True;
-
-        timeout = time.time() + allowed_time
-        while time.time() < timeout:
-            if grow:
-                self.grow_roadmap(2 * self.construction_phase_time)
+    def construct_roadmap(self, allowed_iters : int = 1):
+        for i in range(allowed_iters):
+            print(f"Running phase {i}")
+            if i % 2 == 0:
+                self.grow_roadmap(3 * self.construction_phase_iters)
             else:
-                self.expand_roadmap(self.construction_phase_time)
-
-            grow = not grow
+                self.expand_roadmap(self.construction_phase_iters)
 
         return self.roadmap
 
-    def grow_roadmap(self, allowed_time):
-        timeout = time.time() + allowed_time
-        while time.time() < timeout:
+    def grow_roadmap(self, allowed_iters):
+        for i in range(allowed_iters):
+            print(f"Running grow phase {i}")
             free_qs, _ = self.problem.random_coll_free_q(n_samples=100)
 
             # Necessary for pybullet backend
@@ -177,6 +169,8 @@ class PRM:
 
             vertices = self.roadmap.add(free_qs)
             vertices_np = torch.stack([v.q for v in vertices]).cpu().numpy()
+
+            print(f"Added {len(vertices)}")
 
             self.nn.add_points(vertices_np)
             query_results = self.nn.query(vertices_np)
@@ -197,17 +191,18 @@ class PRM:
 
         self.nn.add_points(vertices_np)
 
-    def expand_roadmap(self, allowed_time):
+    def expand_roadmap(self, allowed_iters):
         vertices = list(self.roadmap.vertices.values())
         weights = list(map(lambda v: (v.total_connection_attempts - v.successful_connection_attempts) / v.total_connection_attempts, vertices))
         weights = torch.tensor(weights)
         probs = weights / weights.sum()
         dist = Categorical(probs=probs)
 
-        timeout = time.time() + allowed_time
-        while time.time() < timeout:
+        for _ in range(allowed_iters):
             i = dist.sample()
             v = vertices[i]
+
+            print(f"Making a random bounce motion for {i}")
 
             bounce_points = self._random_bounce_motion(v.q);
             bounce_vertices = self.roadmap.add(bounce_points)

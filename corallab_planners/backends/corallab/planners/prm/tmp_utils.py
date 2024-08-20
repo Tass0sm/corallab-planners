@@ -1,6 +1,8 @@
 # From: https://github.com/caelan/motion-planners/master/motion_planners/prm.py
 
 import torch
+import numpy as np
+from copy import copy
 
 try:
     from collections import Mapping, namedtuple
@@ -16,23 +18,32 @@ class Vertex(object):
 
     def __init__(self, q):
         self.q = q
+        self.time = None
         self.edges = {}
         self._handle = None
         self.total_connection_attempts = 0
         self.successful_connection_attempts = 0
 
     def __lt__(self, other):
-        return (self.q.norm() < other.q.norm()).item()
+        # return (self.q.norm() < other.q.norm()).item()
+        return (np.linalg.norm(self.q) < np.linalg.norm(other.q))
 
     def __le__(self, other):
-        return (self.q.norm() <= other.q.norm()).item()
+        # return (self.q.norm() <= other.q.norm()).item()
+        return (np.linalg.norm(self.q) <= np.linalg.norm(other.q))
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return (self.q == other.q).all() and (self.time == other.time)
 
     def clear(self):
         self._handle = None
 
     def draw(self, ax, color="red"):
         assert len(self.q) == 2
-        p = self.q.cpu().numpy()
+        p = self.q # .cpu().numpy()
         x, y = p[0], p[1]
         circle = plt.Circle((x, y), 0.005, color="black", linewidth=0, alpha=1)
         ax.add_patch(circle)
@@ -84,8 +95,8 @@ class Edge(object):
             return
 
         assert len(self.v1.q) == 2 and len(self.v2.q) == 2
-        p1 = self.v1.q.cpu().numpy()
-        p2 = self.v2.q.cpu().numpy()
+        p1 = self.v1.q # .cpu().numpy()
+        p2 = self.v2.q # .cpu().numpy()
         dx, dy = p2 - p1
 
         color = "orange" if self.in_shortest_path else "black"
@@ -119,11 +130,15 @@ class Roadmap(Mapping, object):
     def __getitem__(self, q):
         if isinstance(q, torch.Tensor):
             q = to_tuple(q)
+        elif isinstance(q, np.ndarray):
+            q = to_tuple(q)
 
         return self.vertices[q]
 
     def __contains__(self, q):
         if isinstance(q, torch.Tensor):
+            q = to_tuple(q)
+        elif isinstance(q, np.ndarray):
             q = to_tuple(q)
 
         return q in self.vertices
@@ -187,7 +202,7 @@ class Roadmap(Mapping, object):
 
 def a_star(prm, q1, q2):
     if q1 not in prm.roadmap or q2 not in prm.roadmap:
-        return None, {}
+        return None
 
     # A*
     start, goal = prm.roadmap[q1], prm.roadmap[q2]
@@ -220,8 +235,87 @@ def a_star(prm, q1, q2):
                 nodes[nv] = SearchNode(cost, cv)
                 heappush(queue, (cost + heuristic(nv), nv))
 
-    if len(solution_l) == 0:
-        return None, {}
-    else:
-        solution = torch.stack(solution_l)
-        return solution, {}
+    return solution_l
+
+
+TimedSearchNode = namedtuple('TimedSearchNode', ['cost', 'time', 'parent'])
+
+
+def constrained(task, main_i, v, constraints):
+    for c in constraints:
+        if v.time in c.time:
+            idx = (c.time == v.time).argwhere().squeeze()
+            other_state = c.traj[idx]
+
+            if main_i == 0 and c.i == 1:
+                main_state = torch.tensor(v.q, **task.tensor_args)
+                joint_state = torch.cat([main_state, other_state])
+            elif main_i == 1 and c.i == 0:
+                main_state = torch.tensor(v.q, **task.tensor_args)
+                joint_state = torch.cat([other_state, main_state])
+            else:
+                raise NotImplementedError
+
+            in_coll = task.check_collision(joint_state)
+            if in_coll:
+                return True
+
+    return False
+
+# space time a_star with constraints
+def constrained_a_star(task, prm, main_i, q1, q2, goal_time, constraints):
+    if q1 not in prm.roadmap or q2 not in prm.roadmap:
+        return None
+
+    # A*
+    start, goal = prm.roadmap[q1], prm.roadmap[q2]
+    start = copy(start)
+    start.time = 0
+
+    goal.time = goal_time
+    heuristic = lambda v: prm.distance_fn(v.q, goal.q)  # lambda v: 0
+
+    queue = [(heuristic(start), start)]
+    nodes, processed = {start: SearchNode(0, None)}, set()
+    solution_l = None
+    prev = None
+
+    def retrace(v):
+        if nodes[v].parent is None:
+            return [v.q]
+
+        v.edges[nodes[v].parent].in_shortest_path = True
+        return retrace(nodes[v].parent) + v.edges[nodes[v].parent].path(nodes[v].parent)
+
+    while len(queue) != 0:
+        _, cv = heappop(queue)
+
+        if cv in processed:
+            continue
+
+        processed.add(cv)
+
+        if cv == goal:
+            solution_l = retrace(cv)
+            break
+
+        for nv in cv.edges:
+            nv = copy(nv)
+            nv.time = cv.time + 1
+            cost = nodes[cv].cost + prm.distance_fn(cv.q, nv.q)
+            if ((nv not in nodes) or (cost <= nodes[nv].cost)) and not constrained(task, main_i, nv, constraints):
+                nodes[nv] = SearchNode(cost, cv)
+                heappush(queue, (cost + heuristic(nv), nv))
+
+        # Also relax over self loop to allow waiting in place
+        nv = copy(cv)
+        nv.time = cv.time + 1
+        cost = nodes[cv].cost + prm.distance_fn(cv.q, nv.q) # should be 0
+        if not constrained(task, main_i, nv, constraints):
+            nodes[nv] = SearchNode(cost, cv)
+            heappush(queue, (cost + heuristic(nv), nv))
+
+        prev = cv
+
+
+    return solution_l

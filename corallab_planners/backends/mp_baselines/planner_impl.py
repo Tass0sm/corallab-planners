@@ -38,25 +38,30 @@ class MPBaselinesPlanner(PlannerInterface):
     ):
         n_dof = problem.get_q_dim()
 
-        tmp_start_state = torch.zeros((2 * n_dof,))
-        tmp_start_state_pos = torch.zeros((n_dof,))
-        tmp_goal_state = torch.zeros((2 * n_dof,))
-        tmp_goal_state_pos = torch.zeros((n_dof,))
+        tmp_start_state = torch.zeros((2 * n_dof,), **tensor_args)
+        tmp_start_state_pos = torch.zeros((n_dof,), **tensor_args)
+        tmp_goal_state = torch.zeros((2 * n_dof,), **tensor_args)
+        tmp_goal_state_pos = torch.zeros((n_dof,), **tensor_args)
 
-        task_impl = task.task_impl.task_impl
+        task_impl = problem.problem_impl.task_impl
+        robot_impl = task_impl.robot
 
         PlannerClass = mp_baselines_planners[planner_name]
 
         self.planner_impl = PlannerClass(
             n_dof=n_dof,
             task=task_impl,
+            robot=robot_impl,
 
-            start_state=tmp_start_state,
+            start_state=tmp_start_state_pos,
             start_state_pos=tmp_start_state_pos,
 
-            goal_state=tmp_goal_state,
+            goal_state=tmp_goal_state_pos,
             goal_state_pos=tmp_goal_state_pos,
-            multi_goal_states=tmp_goal_state.unsqueeze(0),
+            multi_goal_states=tmp_goal_state_pos.unsqueeze(0),
+
+            num_particles_per_goal=1,
+            collision_fields=task_impl.get_collision_fields(),
 
             tensor_args=tensor_args,
             **kwargs,

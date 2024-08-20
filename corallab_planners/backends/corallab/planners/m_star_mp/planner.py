@@ -1,4 +1,5 @@
 from corallab_lib.backends.corallab.implicit_graph import ImplicitGraph
+from corallab_lib.backends.corallab import PebbleMotionContinuousValidator
 from corallab_lib import MotionPlanningProblem, PebbleMotionProblem
 
 from corallab_planners import Planner
@@ -45,16 +46,9 @@ class M_STAR_MP(MultiAgentPRMPlanner):
             self,
             start,
             goal,
-            prm_construction_time : float = 5.0,
             **kwargs
     ):
-        # Create subrobot PRM
-        if not self.loaded_roadmaps:
-            for prm in self.prms:
-                print("Constructing a PRM...")
-                prm.planner_impl.planner_impl.construct_roadmap(
-                    allowed_time=prm_construction_time
-                )
+        self.construct_roadmaps()
 
         # self._visualize_roadmap()
 
@@ -74,8 +68,10 @@ class M_STAR_MP(MultiAgentPRMPlanner):
         # Solve Discrete Problem
         p = PebbleMotionProblem(
             graph=self.implicit_graph,
+            validator=PebbleMotionContinuousValidator(self.problem),
             backend="corallab"
         )
+
         planner = Planner(
             "M_STAR",
             problem=p,

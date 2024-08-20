@@ -196,6 +196,7 @@ class OMPLPlanner(PlannerInterface):
 
     def _is_state_valid(self, q):
         q_arr = np.array([q[i] for i in range(self.q_dim)])
+        q_arr = q_arr.reshape((1, 1, -1))
         in_collision = self.problem.check_collision(q_arr).item()
         # if no collision, its valid
         return not bool(in_collision)

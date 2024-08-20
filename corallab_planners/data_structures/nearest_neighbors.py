@@ -6,8 +6,9 @@ class NearestNeighbors:
     "FLANN based nearest neighbors datastructure."
 
 
-    def __init__(self):
-        self.flann = FLANN()
+    def __init__(self, seed=0):
+        self.flann = FLANN(random_seed=seed)
+        self.seed = seed
         self.params = None
 
     def add_point(self, x):
@@ -18,7 +19,7 @@ class NearestNeighbors:
 
     def add_points(self, xs):
         if self.flann._FLANN__curindex is None:
-            self.params = self.flann.build_index(xs)
+            self.params = self.flann.build_index(xs, random_seed=self.seed)
         else:
             self.flann.add_points(xs)
 

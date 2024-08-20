@@ -138,6 +138,17 @@ class MultiAgentPRMPlanner:
 
     ##################################################
 
+    def construct_roadmaps(
+            self,
+            prm_construction_iters : int = 1,
+    ):
+        if not self.loaded_roadmaps:
+            for prm in self.prms:
+                print("Constructing a PRM...")
+                prm.planner_impl.planner_impl.construct_roadmap(
+                    allowed_iters=prm_construction_iters
+                )
+
     def solve(
             self,
             start,

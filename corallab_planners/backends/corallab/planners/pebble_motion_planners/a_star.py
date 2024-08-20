@@ -2,15 +2,8 @@ import torch
 import numpy as np
 from heapq import heappop, heappush
 
-try:
-    from collections import namedtuple
-except ImportError:
-    from collections.abc import namedtuple
-
 from corallab_lib import PebbleMotionProblem
-
-
-SearchNode = namedtuple('SearchNode', ['cost', 'parent'])
+from .search_node import SearchNode
 
 
 class A_STAR:
@@ -19,6 +12,8 @@ class A_STAR:
             self,
             problem : PebbleMotionProblem,
     ):
+        assert problem.n_pebbles == 1, "A_STAR only works with one pebble"
+
         self.problem = problem
         self.graph = problem.graph
 

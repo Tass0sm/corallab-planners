@@ -3,18 +3,12 @@ import itertools
 import numpy as np
 from heapq import heappop, heappush
 
-try:
-    from collections import namedtuple
-except ImportError:
-    from collections.abc import namedtuple
-
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
 
 from corallab_lib import PebbleMotionProblem
 from corallab_lib.backends.corallab.roadmap import Roadmap
 from corallab_lib.backends.corallab.implicit_graph import ImplicitGraph
-
-SearchNode = namedtuple('SearchNode', ['cost', 'parent'])
+from .search_node import SearchNode
 
 
 class M_STAR:
@@ -27,6 +21,7 @@ class M_STAR:
             **kwargs
     ):
         assert isinstance(problem.graph, ImplicitGraph), "M_STAR needs a multiagent roadmap"
+        assert problem.n_pebbles == 1, "M_STAR only works with one pebble"
 
         self.n_iters = n_iters
         self.max_time = max_time
@@ -195,8 +190,10 @@ class M_STAR:
 
                     self.backprop_set_dict[nv].add(cv)
 
+                    transitions = [(cv.q, nv.q)]
+                    valid, info = self.problem.check_motion(transitions, margin=0)
                     # TODO: Really need to use margin=0?????
-                    if self.problem.check_local_motion(cv.q, nv.q, margin=0):
+                    if valid:
                         if (nv not in nodes) or (cost < nodes[nv].cost):
                             # print(f"Relaxing {nv} with cost {cost}")
                             nodes[nv] = SearchNode(cost, cv)
