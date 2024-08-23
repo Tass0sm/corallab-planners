@@ -1,8 +1,13 @@
 import numpy as np
 
-from pydrake.multibody.inverse_kinematics import GlobalInverseKinematics
+from pydrake.multibody.inverse_kinematics import InverseKinematics
+from pydrake.math import RigidTransform, RotationMatrix
 from pydrake.common.eigen_geometry import Quaternion
-import pydrake.solvers as mp
+from pydrake.multibody.parsing import Parser
+from pydrake.systems.analysis import Simulator
+from pydrake.all import MultibodyPlant
+
+from pydrake.solvers import MathematicalProgram, Solve
 
 from corallab_lib import Robot, InverseKinematicsProblem
 
@@ -18,7 +23,7 @@ class DrakeIKSolver():
 
     def __init__(
             self,
-            solver_name : str,
+            # solver_name : str,
             problem : InverseKinematicsProblem = None,
 
             # allowed_time: float = DEFAULT_PLANNING_TIME,
@@ -33,147 +38,116 @@ class DrakeIKSolver():
             # sampler_kwargs = {},
             **kwargs
     ):
-
-        self.solver_name = solver_name
+        self.solver_name = "InverseKinematics"
         self.problem = problem
+        self.retract_config = problem.retract_config.flatten().cpu().numpy()
 
-        robot_id = problem.robot.id
-        drake_robot = Robot(robot_id, backend="drake")
+        # Get Plant
+        robot_id = self.problem.robot.id
+        self.drake_robot = Robot(robot_id, backend="drake")
+        self.plant_f = self.drake_robot.plant
+        self.model_idx = self.drake_robot.model_idx
+        self.world_frame = self.plant_f.world_frame()
 
-        self.global_ik = GlobalInverseKinematics(drake_robot.plant)
-
-        for name, pose in problem.goal_poses.items():
-            body = drake_robot.plant.GetBodyByName(name)
-            np_pose = pose.position[0].unsqueeze(1).cpu().numpy()
-            lb_tol = np.ones_like(np_pose) * 0.05
-            ub_tol = np.ones_like(np_pose) * 0.05
-
-            np_quat = pose.quaternion[0].unsqueeze(1).cpu().numpy()
-            quat = Quaternion(np_quat)
-
-            self.global_ik.AddWorldPositionConstraint(body.index(), np_pose, lb_tol, ub_tol)
-            self.global_ik.AddWorldOrientationConstraint(body.index(), quat, 0.1)
-
-        np_retract_config = problem.retract_config.unsqueeze(1).cpu().numpy()
-        pos_cost = np.ones((drake_robot.plant.num_bodies(), 1)) * 1
-        orn_cost = np.ones((drake_robot.plant.num_bodies(), 1)) * 1
-
-        self.global_ik.AddPostureCost(
-            np_retract_config,
-            pos_cost,
-            orn_cost,
-        )
-
-# q_desired: numpy.ndarray[numpy.float64[m, 1]],
-#                                     body_position_cost: numpy.ndarray[numpy.float64[m, 1]],
-#                                     body_orientation_cost: numpy.ndarray[numpy.float64[m, 1]])
-
-
-        # self.q_dim = problem.get_q_dim()
-
-        # self.allowed_time = allowed_time
-        # self.simplify_solution = simplify_solution
-        # self.interpolate_solution = interpolate_solution
-        # self.interpolate_num = interpolate_num
-        # self.seed = seed
-
-        # # OMPL Objects
-        # self.space = StateSpace(self.q_dim)
-
-        # min_q_bounds = (problem.get_q_min() * 2).tolist()
-        # max_q_bounds = (problem.get_q_max() * 2).tolist()
-        # bounds = ob.RealVectorBounds(self.q_dim)
-        # joint_bounds = zip(min_q_bounds, max_q_bounds)
-        # for i, (lower_limit, upper_limit) in enumerate(joint_bounds):
-        #     bounds.setLow(i, lower_limit)
-        #     bounds.setHigh(i, upper_limit)
-        # self.space.setBounds(bounds)
-
-        # self.ss = og.SimpleSetup(self.space)
-        # self.ss.setStateValidityChecker(ob.StateValidityCheckerFn(self._is_state_valid))
-        # self.si = self.ss.getSpaceInformation()
-
-        # if ValidStateSamplerOverride:
-        #     def allocValidStateSampler(si):
-        #         return ValidStateSamplerOverride(si, **sampler_kwargs)
-
-        #     self.si.setValidStateSamplerAllocator(
-        #         ob.ValidStateSamplerAllocator(allocValidStateSampler)
-        #     )
-
-        # if self.simplify_solution:
-        #     self.ps = og.PathSimplifier(self.si)
-
-        # self.planner_name = planner_name
-        # self.set_planner(planner_name)
-        pass
+        # Allocate float context to be used by evaluators.
+        self.context_f = self.plant_f.CreateDefaultContext()
+        # # Create AutoDiffXd plant and corresponding context.
+        self.plant_ad = self.plant_f.ToAutoDiffXd()
+        self.context_ad = self.plant_ad.CreateDefaultContext()
 
     @property
     def name(self):
         return f"drake_{self.solver_name}"
 
-    # def set_planner(self, planner_name):
-    #     if planner_name == "PRM":
-    #         self.planner = og.PRM(self.ss.getSpaceInformation())
-    #     elif planner_name == "RRT":
-    #         self.planner = og.RRT(self.ss.getSpaceInformation())
-    #     elif planner_name == "RRTConnect":
-    #         self.planner = og.RRTConnect(self.ss.getSpaceInformation())
-    #     elif planner_name == "RRTstar":
-    #         self.planner = og.RRTstar(self.ss.getSpaceInformation())
-    #     elif planner_name == "EST":
-    #         self.planner = og.EST(self.ss.getSpaceInformation())
-    #     elif planner_name == "FMT":
-    #         self.planner = og.FMT(self.ss.getSpaceInformation())
-    #     elif planner_name == "BITstar":
-    #         self.planner = og.BITstar(self.ss.getSpaceInformation())
-    #     elif planner_name == "STRIDE":
-    #         self.planner = og.STRIDE(self.ss.getSpaceInformation())
-    #     elif planner_name == "AITStar":
-    #         self.planner = og.AITstar(self.ss.getSpaceInformation())
-    #     elif planner_name == "KPIECE1":
-    #         self.planner = og.KPIECE1(self.ss.getSpaceInformation())
-    #     else:
-    #         print("{} not recognized, please add it first".format(planner_name))
-    #         return
+    def _add_retract_config_cost(self, prog, variables):
+        def distance_to_retract_config(q):
+            """Evaluates squared distance between q and retract_q."""
+            # Choose plant and context based on dtype.
+            if q.dtype == float:
+                plant = self.plant_f
+                context = self.context_f
+            else:
+                # Assume AutoDiff.
+                plant = self.plant_ad
+                context = self.context_ad
 
-    #     if planner_name not in ["PRM", "AITStar"]:
-    #         self.planner.setRange(1.0)
+            diffs = (q - self.retract_config) + 0.01
+            weighted_diffs = diffs
+            return np.linalg.norm(weighted_diffs)
 
-    #     self.ss.setPlanner(self.planner)
+        prog.AddCost(distance_to_retract_config, vars=variables)
+
+    def _add_arm_shape_constraints(self, prog, variables):
+        # prog.AddConstraint(variables[1] >= -1.9)
+        # prog.AddConstraint(variables[1] <= -0.0)
+        # prog.AddConstraint(variables[1] >= -1.0)
+        # prog.AddCost(distance_to_retract_config, vars=variables)
+        pass
+
+    def _add_position_constraint(self, ik, link, pos):
+        link_frame = self.plant_f.GetBodyByName(link).body_frame()
+
+        p_BQ = np.array([0.0, 0.0, 0.0])
+        # p_AQ_lower = pos - np.array([0.05, 0.05, 0.05])
+        # p_AQ_upper = pos + np.array([0.05, 0.05, 0.05])
+        p_AQ_lower = pos - np.array([0.2, 0.2, 0.2])
+        p_AQ_upper = pos + np.array([0.2, 0.2, 0.2])
+
+        ik.AddPositionConstraint(
+            frameB=link_frame, p_BQ=p_BQ,
+            frameA=self.world_frame, p_AQ_lower=p_AQ_lower, p_AQ_upper=p_AQ_upper
+        )
+
+    def _add_orientation_constraint(self, ik):
+        ee_link_frame = self.plant_f.GetBodyByName("ee_link").body_frame()
+
+        identity_quat = Quaternion(np.array([1.0, 0.0, 0.0, 0.0]))
+        ee_target_quat = Quaternion(np.array([ 0.0000, -0.7071,  0.0000,  0.7071]))
+
+        identity_rotation = RotationMatrix(identity_quat)
+        ee_target_rotation = RotationMatrix(ee_target_quat)
+
+        # Constrain the identity rotation in the ee_link frame to match the
+        # desired rotation in the base frame.
+        ik.AddOrientationConstraint(
+            frameBbar=ee_link_frame, R_BbarB=identity_rotation,
+            frameAbar=self.world_frame, R_AbarA=ee_target_rotation,
+            theta_bound=0.05
+        )
+
+    def _add_flat_link_constraint(self, ik, link):
+        link_frame = self.plant_f.GetBodyByName(link).body_frame()
+
+        z_vec = np.array([[1.0, 0.0, 0.0]]).T
+        ee_target_vec = np.array([[0.0, 0.0, -1.0]]).T
+
+        ik.AddAngleBetweenVectorsConstraint(
+            frameB=link_frame, nb_B=z_vec,
+            frameA=self.world_frame, na_A=ee_target_vec,
+            angle_lower=0.0, angle_upper=0.01
+        )
 
     def solve(
             self,
             **kwargs,
     ):
+        ik = InverseKinematics(plant=self.plant_f, plant_context=self.context_f)
+        for name, pose in self.problem.goal_poses.items():
+            pos = pose.position[0].flatten().cpu().numpy()
+            self._add_position_constraint(ik, name, pos)
+            self._add_flat_link_constraint(ik, name)
 
-        solver = mp.IpoptSolver()
+        # CUSTOM
+        prog = ik.get_mutable_prog()
+        q = ik.q()
+        self._add_retract_config_cost(prog, q)
 
-        breakpoint()
+        q0 = self.retract_config.astype("float64")
+        prog = ik.prog()
+        result = Solve(prog, initial_guess=q0)
 
-        if solver.available():
-            np_retract_config = self.problem.retract_config.unsqueeze(1).cpu().numpy()
-            self.global_ik.SetInitialGuess(q=np_retract_config)
-            result = solver.Solve(self.global_ik.prog())
-            # self.assertTrue(result.is_success())
-            global_ik.ReconstructGeneralizedPositionSolution(result=result)
-        else:
-            raise NotImplementedError()
-
-
-        # breakpoint()
-
-        # solver_id = SolverId("MixedIntegerBranchAndBound")
-        # mibnb = MixedIntegerBranchAndBound(self.program.prog(), solver_id)
-        # result = mibnb.Solve()
-
-        # result = Solve(self.program.prog(), initial_guess=np_retract_config)
-
-
-        # print(f"Success? {result.is_success()}")
-        # print(result.get_solution_result())
-        # q_sol = result.GetSolution(q)
-        # print(q_sol)
-
-
-        raise NotImplementedError()
+        q_sol = result.GetSolution(q)
+        return q_sol, {
+            "success": result.is_success(),
+            "result": result.get_solution_result()
+        }
