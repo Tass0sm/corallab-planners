@@ -11,7 +11,7 @@ from math import fabs
 from itertools import combinations
 from copy import deepcopy
 
-from corallab_lib import DynamicPlanningProblem
+from corallab_lib import DynamicPlanningProblem, Robot
 from corallab_planners import DynamicPlanner
 
 from typing import Callable
@@ -19,12 +19,15 @@ from typing import Callable
 from corallab_lib import MotionPlanningProblem
 
 from corallab_lib.backends.torch_robotics.env_impl import TorchRoboticsEnv
+from corallab_lib.backends.torch_robotics.motion_planning_problem_impl import TorchRoboticsMotionPlanningProblem
+from corallab_lib.backends.pybullet.env_impl import PybulletEnv
 
 import scipy.interpolate
 
 from torch_robotics.torch_utils.torch_utils import DEFAULT_TENSOR_ARGS
 from torch_robotics.visualizers.planning_visualizer import PlanningVisualizer
 from torch_robotics.torch_utils.torch_timer import TimerCUDA
+from torch_robotics.robots import MultiRobot
 
 
 class Constraint:
@@ -33,6 +36,9 @@ class Constraint:
         self.i = i
         self.traj = traj
         self.time = time
+
+    def __str__(self):
+        return f"Constrait with {self.i} in {self.traj} over {self.time}"
 
 
 class Conflict:
@@ -43,6 +49,9 @@ class Conflict:
         self.traj_i = traj_i
         self.traj_j = traj_j
         self.time = time
+
+    def __str__(self):
+        return f"Conflict over {self.time}"
 
     # def __str__(self):
     #     return "VC: " + str([str(vc) for vc in self.vertex_constraints])  + \
@@ -72,7 +81,8 @@ class HighLevelNode:
                 if sol is None:
                     self.cost += 999
                 else:
-                    self.cost += sol.diff(dim=0).square().sum(dim=-1).sqrt().sum()
+                    self.cost += np.linalg.norm(np.diff(sol, axis=0), axis=-1).sum()
+                    # self.cost += sol.diff(dim=0).square().sum(dim=-1).sqrt().sum()
         else:
             self.cost = 999.0
 
@@ -85,6 +95,11 @@ class HighLevelNode:
 
     def __lt__(self, other):
         return self.cost < other.cost
+
+    def __str__(self):
+        return f"""HighLevelNode
+constraints = {self.constraints}
+cost = {self.cost}"""
 
 
 class K_CBS:
@@ -126,10 +141,25 @@ class K_CBS:
 
         # Subrobot planners
         for i, r in enumerate(self.subrobots):
-            backend = "torch_robotics" if isinstance(problem.env, TorchRoboticsEnv) else "curobo"
+
+            # TODO: Fix
+            if isinstance(problem.env, TorchRoboticsEnv):
+                backend = "torch_robotics"
+                env_impl = problem.env
+            elif isinstance(problem.env, PybulletEnv):
+                backend = "pybullet"
+                breakpoint()
+                env_impl = PybulletEnv(
+                    problem.env.id,
+                    connection_mode="DIRECT",
+                    hostname=f"DynamicEnv{i}"
+                )
+            else:
+                backend = "curobo"
+                env_impl = problem.env
 
             single_robot_problem = DynamicPlanningProblem(
-                env_impl=problem.env,
+                env_impl=env_impl,
                 robot=r,
                 backend=backend
             )
@@ -139,7 +169,7 @@ class K_CBS:
             single_robot_planner = DynamicPlanner(
                 planner_name="RRT",
                 problem=single_robot_problem,
-                backend="corallab"
+                backend="ompl"
             )
 
             self.subrobot_dict[i] = (single_robot_problem, single_robot_planner)
@@ -173,6 +203,9 @@ class K_CBS:
 
                 if isinstance(sol, list):
                     sol = sol[0]
+
+                if isinstance(time, list):
+                    time = time[0]
 
                 sols[i] = sol
                 sol_times[i] = time
@@ -233,16 +266,23 @@ class K_CBS:
 
         return times
 
-    def _create_joint_solution(self, times, solutions, concatenate=False):
+    def _create_joint_solution(self, times, solutions, n_steps, concatenate=False):
         times_l = list(times.values())
         solutions_l = list(solutions.values())
 
-        combined_times = torch.cat(times_l).unique().sort()[0]
+        # combined_times = np.unique(np.concatenate(times_l))
+        # combined_times.sort()
 
-        if self.interpolate_solution:
-            combined_times = self._interpolate_times(combined_times)
+        # if self.interpolate_solution:
+        #     ts = self._interpolate_times(combined_times)
 
-        time_solution_iter = map(lambda p: (p[0].cpu(), p[1].cpu()), zip(times_l, solutions_l))
+        #     if ts is not None:
+        #         combined_times = ts
+
+        final_time = max([ts[-1] for ts in times_l])
+        combined_times = np.linspace(0, final_time, num=n_steps)
+
+        time_solution_iter = map(lambda p: (p[0], p[1]), zip(times_l, solutions_l))
         interpolators = [scipy.interpolate.interp1d(t, s, axis=0, bounds_error=False, fill_value=(s[0], s[-1])) for t, s in time_solution_iter]
         interpolated_solutions = [f(combined_times) for f in interpolators]
 
@@ -256,7 +296,7 @@ class K_CBS:
     def _get_first_conflict(self, node):
         times = node.times
         solutions = node.solutions
-        combined_times, joint_solutions_l = self._create_joint_solution(times, solutions, concatenate=False)
+        combined_times, joint_solutions_l = self._create_joint_solution(times, solutions, self.interpolate_num * 5, concatenate=False)
         joint_solution = np.concatenate(joint_solutions_l, axis=-1)
 
         r_i, r_j = None, None
@@ -265,9 +305,9 @@ class K_CBS:
 
         i = 0
         while i < len(joint_solution):
-            state = joint_solution[i]
+            state = joint_solution[i].reshape(1, 1, -1)
             # in_collision, info = self.task.get_self_collision_info(state)
-            in_collision, info = self.problem.check_collision_info(state, margin=0)
+            in_collision, info = self.problem.compute_collision_info(state, margin=0)
 
             if info["cost_collision_objects"]:
                 print("Somehow found object collision?")
@@ -285,10 +325,10 @@ class K_CBS:
                 r_i = r_i.item()
                 r_j = r_j.item()
 
-                j = i + 1
-                while j < len(joint_solution):
-                    state = joint_solution[j]
-                    in_collision, info = self.problem.check_collision_info(state, margin=0)
+                idx_e = i + 1
+                while idx_e < len(joint_solution):
+                    state = joint_solution[idx_e].reshape(1, 1, -1)
+                    in_collision, info = self.problem.compute_collision_info(state, margin=0)
 
                     if info["self_collision_robots"] is None or info["self_collision_robots"].nelement() == 0:
                         self_collision_robots = []
@@ -296,11 +336,10 @@ class K_CBS:
                         self_collision_robots = info["self_collision_robots"][:, 1:].flatten().unique()
 
                     if r_i not in self_collision_robots and r_j not in self_collision_robots:
-                        t_e = combined_times[j]
-                        idx_e = j+1
+                        t_e = combined_times[idx_e]
                         break
 
-                    j += 1
+                    idx_e += 1
 
             if t_e is not None:
                 break
@@ -317,8 +356,18 @@ class K_CBS:
             return Conflict(r_i, r_j, traj_i, traj_j, time)
 
     def _merge_subrobots(self, i, j):
-        merged_robot = None
-        raise NotImplementedError
+        assert isinstance(self.problem.problem_impl, TorchRoboticsMotionPlanningProblem), "Merging is only supported for the torch_robotics backend"
+
+        tr_multi_robot = MultiRobot(
+            subrobots=[self.subrobots[i].robot_impl.robot_impl,
+                       self.subrobots[j].robot_impl.robot_impl],
+            tensor_args=self.tensor_args,
+        )
+
+        merged_robot = Robot(
+            from_impl=tr_multi_robot,
+            backend="torch_robotics"
+        )
 
         merged_robot_problem = DynamicPlanningProblem(
             env_impl=self.problem.env,
@@ -329,7 +378,7 @@ class K_CBS:
         merged_robot_planner = DynamicPlanner(
             planner_name="RRT",
             problem=merged_robot_problem,
-            backend="corallab"
+            backend="ompl"
         )
 
         del self.subrobot_dict[i]
@@ -359,14 +408,18 @@ class K_CBS:
         start_i = separate_starts[robot_idx]
         goal_i = separate_goals[robot_idx]
 
+
         sol, info = planner.solve(start_i, goal_i)
+        time = info["time"]
 
         if isinstance(sol, list):
             sol = sol[0]
 
+        if isinstance(time, list):
+            time = time[0]
+
         if sol is not None:
             node.solutions[robot_idx] = sol
-            time = info["time"]
             node.times[robot_idx] = time
         else:
             print("Failed Replanning")
@@ -418,7 +471,7 @@ class K_CBS:
         if len(sol_l) == 0 or len(info_l) == 0:
             return None, {}
 
-        joint_times = torch.stack([info["joint_times"] for info in info_l])
+        joint_times = np.stack([info["joint_times"] for info in info_l])
         joint_solutions = np.stack(sol_l)
 
         return joint_solutions, { "joint_times": joint_times }
@@ -435,6 +488,8 @@ class K_CBS:
         solutions, times = self._solve_individual_problems(start, goal)
         ct_root = HighLevelNode(solutions, times)
 
+        print("MADE INDIVIDUAL SOLUTIONS")
+
         conflict_count_matrix = np.zeros((self.n_subrobots, self.n_subrobots))
         queue = [ct_root]
 
@@ -443,6 +498,8 @@ class K_CBS:
                 iteration += 1
 
                 current_node = queue[0]
+
+                print(f"NOW LOOKING AT {current_node}")
 
                 if not current_node.has_full_solution():
                     current_node = heapq.heappop(queue)
@@ -454,12 +511,24 @@ class K_CBS:
                     k = self._get_first_conflict(current_node)
 
                     if k is None:
+                        print(f"FOUND NO CONFLICT")
                         solution = current_node;
                         break;
                     elif conflict_count_matrix[k.i, k.j] > self.merge_threshold:
-                        breakpoint()
                         self._merge_subrobots(k.i, k.j)
+
+                        solutions, times = self._solve_individual_problems(start, goal)
+                        ct_root = HighLevelNode(solutions, times)
+
+                        print("MADE INDIVIDUAL SOLUTIONS")
+
+                        conflict_count_matrix = np.zeros((self.n_subrobots, self.n_subrobots))
+                        queue = [ct_root]
+
+                        breakpoint()
                     else:
+                        print(f"FOUND CONFLICT {k}")
+
                         current_node = heapq.heappop(queue)
 
                         conflict_count_matrix[k.i, k.j] += 1
@@ -475,15 +544,20 @@ class K_CBS:
                                 parent=current_node
                             )
 
+                            print(f"REPLANNING FOR {b_idx}")
+
                             self._attempt_replan(b_idx, new_node, start, goal)
                             heapq.heappush(queue, new_node)
+
+                        # solution = new_node
+                        # break
 
 
         if solution is None:
             print("None Found!!!!!!!")
             return None, {}
 
-        joint_times, joint_solution = self._create_joint_solution(solution.times, solution.solutions, concatenate=True)
+        joint_times, joint_solution = self._create_joint_solution(solution.times, solution.solutions, self.interpolate_num, concatenate=True)
 
         return joint_solution, { "joint_times": joint_times }
 

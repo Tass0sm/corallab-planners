@@ -38,6 +38,8 @@ class DrakeIKSolver():
             # sampler_kwargs = {},
             **kwargs
     ):
+        assert problem.batch_size == 1, "Drake IK Solver can only solve single item batches."
+
         self.solver_name = "InverseKinematics"
         self.problem = problem
         self.retract_config = problem.retract_config.flatten().cpu().numpy()
@@ -78,6 +80,18 @@ class DrakeIKSolver():
         prog.AddCost(distance_to_retract_config, vars=variables)
 
     def _add_arm_shape_constraints(self, prog, variables):
+        # base_0 = variables[0]
+        # prog.AddConstraint(base_0 >= -1.57)
+        # prog.AddConstraint(base_0 <= 1.57)
+
+        # shoulder_0 = variables[1]
+        # prog.AddConstraint(shoulder_0 <= 0.0)
+        # prog.AddConstraint(shoulder_0 >= -0.8 * 3.1514)
+
+        # base_1 = variables[6]
+        # prog.AddConstraint(base_1 >= -1.57)
+        # prog.AddConstraint(base_1 <= 1.57)
+
         # prog.AddConstraint(variables[1] >= -1.9)
         # prog.AddConstraint(variables[1] <= -0.0)
         # prog.AddConstraint(variables[1] >= -1.0)
@@ -88,30 +102,30 @@ class DrakeIKSolver():
         link_frame = self.plant_f.GetBodyByName(link).body_frame()
 
         p_BQ = np.array([0.0, 0.0, 0.0])
-        # p_AQ_lower = pos - np.array([0.05, 0.05, 0.05])
-        # p_AQ_upper = pos + np.array([0.05, 0.05, 0.05])
-        p_AQ_lower = pos - np.array([0.2, 0.2, 0.2])
-        p_AQ_upper = pos + np.array([0.2, 0.2, 0.2])
+        p_AQ_lower = pos - np.array([0.001, 0.001, 0.001])
+        p_AQ_upper = pos + np.array([0.001, 0.001, 0.001])
+        # p_AQ_lower = pos - np.array([0.2, 0.2, 0.2])
+        # p_AQ_upper = pos + np.array([0.2, 0.2, 0.2])
 
         ik.AddPositionConstraint(
             frameB=link_frame, p_BQ=p_BQ,
             frameA=self.world_frame, p_AQ_lower=p_AQ_lower, p_AQ_upper=p_AQ_upper
         )
 
-    def _add_orientation_constraint(self, ik):
-        ee_link_frame = self.plant_f.GetBodyByName("ee_link").body_frame()
+    def _add_orientation_constraint(self, ik, link, quat):
+        link_frame = self.plant_f.GetBodyByName(link).body_frame()
 
         identity_quat = Quaternion(np.array([1.0, 0.0, 0.0, 0.0]))
-        ee_target_quat = Quaternion(np.array([ 0.0000, -0.7071,  0.0000,  0.7071]))
+        target_quat = Quaternion(quat)
 
         identity_rotation = RotationMatrix(identity_quat)
-        ee_target_rotation = RotationMatrix(ee_target_quat)
+        target_rotation = RotationMatrix(target_quat)
 
         # Constrain the identity rotation in the ee_link frame to match the
         # desired rotation in the base frame.
         ik.AddOrientationConstraint(
-            frameBbar=ee_link_frame, R_BbarB=identity_rotation,
-            frameAbar=self.world_frame, R_AbarA=ee_target_rotation,
+            frameBbar=link_frame, R_BbarB=identity_rotation,
+            frameAbar=self.world_frame, R_AbarA=target_rotation,
             theta_bound=0.05
         )
 
@@ -124,22 +138,30 @@ class DrakeIKSolver():
         ik.AddAngleBetweenVectorsConstraint(
             frameB=link_frame, nb_B=z_vec,
             frameA=self.world_frame, na_A=ee_target_vec,
-            angle_lower=0.0, angle_upper=0.01
+            angle_lower=0.0, angle_upper=0.05
         )
 
     def solve(
             self,
+            include_rotation=False,
             **kwargs,
     ):
         ik = InverseKinematics(plant=self.plant_f, plant_context=self.context_f)
         for name, pose in self.problem.goal_poses.items():
             pos = pose.position[0].flatten().cpu().numpy()
+
             self._add_position_constraint(ik, name, pos)
-            self._add_flat_link_constraint(ik, name)
+
+            if include_rotation:
+                quat = pose.quaternion[0].flatten().cpu().numpy()
+                self._add_orientation_constraint(ik, name, quat)
+            else:
+                self._add_flat_link_constraint(ik, name)
 
         # CUSTOM
         prog = ik.get_mutable_prog()
         q = ik.q()
+        self._add_arm_shape_constraints(prog, q)
         self._add_retract_config_cost(prog, q)
 
         q0 = self.retract_config.astype("float64")
@@ -147,7 +169,11 @@ class DrakeIKSolver():
         result = Solve(prog, initial_guess=q0)
 
         q_sol = result.GetSolution(q)
+
+        # breakpoint()
+
         return q_sol, {
             "success": result.is_success(),
-            "result": result.get_solution_result()
+            "result": result.get_solution_result(),
+            "infeasible_constraint_names": result.GetInfeasibleConstraintNames(prog)
         }

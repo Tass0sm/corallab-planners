@@ -43,15 +43,16 @@ class MPBaselinesPlanner(PlannerInterface):
         tmp_goal_state = torch.zeros((2 * n_dof,), **tensor_args)
         tmp_goal_state_pos = torch.zeros((n_dof,), **tensor_args)
 
-        task_impl = problem.problem_impl.task_impl
-        robot_impl = task_impl.robot
+        # task_impl = problem.problem_impl.task_impl
+        task = problem
+        # robot_impl = task_impl.robot
 
         PlannerClass = mp_baselines_planners[planner_name]
 
         self.planner_impl = PlannerClass(
             n_dof=n_dof,
-            task=task_impl,
-            robot=robot_impl,
+            task=task,
+            # robot=robot_impl,
 
             start_state=tmp_start_state_pos,
             start_state_pos=tmp_start_state_pos,
@@ -61,7 +62,7 @@ class MPBaselinesPlanner(PlannerInterface):
             multi_goal_states=tmp_goal_state_pos.unsqueeze(0),
 
             num_particles_per_goal=1,
-            collision_fields=task_impl.get_collision_fields(),
+            # collision_fields=task_impl.get_collision_fields(),
 
             tensor_args=tensor_args,
             **kwargs,

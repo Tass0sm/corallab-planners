@@ -125,6 +125,8 @@ class MRdRRT(MultiAgentPRMPlanner):
         Inputs: list of start and goal configs for robots.
         """
 
+        breakpoint()
+
         self.construct_roadmaps()
 
         # self._visualize_roadmap()

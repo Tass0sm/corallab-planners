@@ -67,7 +67,7 @@ class RRT(RRTBase):
             n_iters: int = 30000,
             step_size: float = 0.1,
             n_radius: float = 1.,
-            max_time: float = 60.,
+            max_time: float = 10.,
             goal_probability: float = 0.2,
             tensor_args: dict = DEFAULT_TENSOR_ARGS,
             n_pre_samples=10000,
@@ -99,7 +99,8 @@ class RRT(RRTBase):
         print_freq = kwargs.get('print_freq', 150)
         debug = kwargs.get('debug', False)
 
-        if self.problem.static_check_collision(start) or self.problem.static_check_collision(goal):
+        if (self.problem.static_check_collision(start.reshape(1, 1, -1)) or
+            self.problem.static_check_collision(goal.reshape(1, 1, -1))):
             return None
 
         iteration = -1
@@ -109,6 +110,8 @@ class RRT(RRTBase):
         self.nodes_tree_torch = self.nodes_tree[0].config
 
         path = None
+
+        breakpoint()
 
         with TimerCUDA() as t:
             while (t.elapsed < self.max_time) and (iteration < self.n_iters):
@@ -126,7 +129,8 @@ class RRT(RRTBase):
                 nearest = self.get_nearest_node(self.nodes_tree, self.nodes_tree_torch, target)
 
                 # create a safe path from the target node to the nearest node
-                extended = self.extend_fn(nearest.config, target, max_step=self.step_size, max_dist=self.n_radius)
+                # no_max_dist=True
+                extended = self.problem.local_motion(nearest.config, target, step=self.step_size).unsqueeze(0)
                 time = torch.linspace(nearest.time, nearest.time + 1, extended.shape[1], **self.tensor_args)
 
                 last_valid, last_valid_time = check_motion(extended, time, self.collision_fn)

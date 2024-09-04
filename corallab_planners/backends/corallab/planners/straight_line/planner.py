@@ -21,6 +21,10 @@ class StraightLinePlanner:
         self.n_support_points = n_support_points
         # self.tensor_args = tensor_args
 
+    @property
+    def name(self):
+        return f"straight_line_planner"
+
     def solve(
             self,
             start,
