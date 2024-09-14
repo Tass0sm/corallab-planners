@@ -16,7 +16,7 @@ class OptimizerPlanner:
             initial_planner_args : dict = {},
 
             optimizer : Optimizer = None,
-            optimizer_name : str = "CHOMP",
+            optimizer_name : str = None, # "CHOMP",
             optimizer_backend = "mp_baselines",
             optimizer_args : dict = {},
             **kwargs
@@ -51,7 +51,7 @@ class OptimizerPlanner:
 
         initial_solution, planner_info = self.initial_planner.solve(start, goal, **kwargs)
 
-        if initial_solution is None:
+        if initial_solution is None or initial_solution.nelement() == 0:
             return None, {}
 
         try:
@@ -66,9 +66,11 @@ class OptimizerPlanner:
             s_iters1 = self.problem.robot.get_position(planner_info["solution_iters"])
             s_iters2 = self.problem.robot.get_position(optimizer_info["solution_iters"])
 
-            s_iters = torch.cat([s_iters1, s_iters2])
-
-            info = { "solution_iters": s_iters }
+            if s_iters1.shape[1:] == s_iters2.shape[2:]:
+                s_iters = torch.cat([s_iters1, s_iters2])
+                info = { "solution_iters": s_iters }
+            else:
+                info = {}
         else:
             info = dict(**planner_info, **optimizer_info)
 

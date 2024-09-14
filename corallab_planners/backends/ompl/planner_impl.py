@@ -117,6 +117,10 @@ class OMPLPlanner(PlannerInterface):
             self.planner.setRange(1.0)
         elif planner_name == "RRTstar":
             self.planner = og.RRTstar(self.ss.getSpaceInformation())
+            self.planner.setRange(1.0)
+        elif planner_name == "InformedRRTstar":
+            self.planner = og.InformedRRTstar(self.ss.getSpaceInformation())
+            self.planner.setRange(1.0)
         elif planner_name == "EST":
             self.planner = og.EST(self.ss.getSpaceInformation())
         elif planner_name == "FMT":

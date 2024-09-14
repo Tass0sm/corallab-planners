@@ -2,6 +2,7 @@ import torch
 import numpy as np
 
 from corallab_lib import MotionPlanningProblem
+from corallab_lib.backends.torch_robotics.motion_planning_problem_impl import TorchRoboticsMotionPlanningProblem
 
 from mp_baselines.planners.chomp import CHOMP
 from mp_baselines.planners.gpmp2 import GPMP2
@@ -36,37 +37,18 @@ class MPBaselinesPlanner(PlannerInterface):
             tensor_args : dict = DEFAULT_TENSOR_ARGS,
             **kwargs
     ):
-        n_dof = problem.get_q_dim()
+        assert problem.backend == "torch_robotics", "MPBaselinesPlanner only supports problems using the torch_robotics backend."
 
-        tmp_start_state = torch.zeros((2 * n_dof,), **tensor_args)
-        tmp_start_state_pos = torch.zeros((n_dof,), **tensor_args)
-        tmp_goal_state = torch.zeros((2 * n_dof,), **tensor_args)
-        tmp_goal_state_pos = torch.zeros((n_dof,), **tensor_args)
+        self.n_dof = problem.get_q_dim()
+        self.task_impl = problem.problem_impl.task_impl
+        self.robot_impl = problem.robot.robot_impl
+        self.tensor_args = self.task_impl.tensor_args
+        self.planner_name = planner_name
+        self.PlannerClass = mp_baselines_planners[planner_name]
+        self.config = kwargs
 
-        # task_impl = problem.problem_impl.task_impl
-        task = problem
-        # robot_impl = task_impl.robot
-
-        PlannerClass = mp_baselines_planners[planner_name]
-
-        self.planner_impl = PlannerClass(
-            n_dof=n_dof,
-            task=task,
-            # robot=robot_impl,
-
-            start_state=tmp_start_state_pos,
-            start_state_pos=tmp_start_state_pos,
-
-            goal_state=tmp_goal_state_pos,
-            goal_state_pos=tmp_goal_state_pos,
-            multi_goal_states=tmp_goal_state_pos.unsqueeze(0),
-
-            num_particles_per_goal=1,
-            # collision_fields=task_impl.get_collision_fields(),
-
-            tensor_args=tensor_args,
-            **kwargs,
-        )
+        if self.planner_name == "CHOMP":
+            self.config["pos_only"] = False
 
     @property
     def name(self):
@@ -84,16 +66,37 @@ class MPBaselinesPlanner(PlannerInterface):
             self,
             start,
             goal,
+            objective=None,
             **kwargs
     ):
-        self.planner_impl.start_state = start
-        self.planner_impl.start_state_pos = start
-        self.planner_impl.goal_state = goal
-        self.planner_impl.goal_state_pos = goal
-        self.planner_impl.multi_goal_states = goal.unsqueeze(0)
-        self.planner_impl.reset()
+        start_state = start
+        start_state_pos = start
+        goal_state = goal
+        goal_state_pos = goal
+        multi_goal_states = goal.unsqueeze(0)
 
-        solution = self.planner_impl.optimize(**kwargs)
+        planner_impl = self.PlannerClass(
+            n_dof=self.n_dof,
+            task=self.task_impl,
+            robot=self.robot_impl,
+
+            start_state=start_state,
+            start_state_pos=start_state_pos,
+
+            goal_state=goal_state,
+            goal_state_pos=goal_state_pos,
+            multi_goal_states=multi_goal_states,
+
+            num_particles_per_goal=1,
+            collision_fields=self.task_impl.get_collision_fields(),
+            cost=objective,
+
+            tensor_args=self.tensor_args,
+            **self.config,
+            **kwargs,
+        )
+
+        solution = planner_impl.optimize(**kwargs)
         info = {}
 
         if solution is None:
@@ -105,4 +108,5 @@ class MPBaselinesPlanner(PlannerInterface):
             return solution.unsqueeze(0), info
 
     def reset(self):
-        self.planner_impl.reset()
+        # self.planner_impl.reset()
+        pass

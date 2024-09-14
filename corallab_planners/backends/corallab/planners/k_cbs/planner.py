@@ -148,7 +148,6 @@ class K_CBS:
                 env_impl = problem.env
             elif isinstance(problem.env, PybulletEnv):
                 backend = "pybullet"
-                breakpoint()
                 env_impl = PybulletEnv(
                     problem.env.id,
                     connection_mode="DIRECT",

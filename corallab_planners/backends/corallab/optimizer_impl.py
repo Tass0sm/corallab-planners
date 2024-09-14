@@ -83,5 +83,11 @@ class CorallabOptimizer(OptimizerInterface):
             traj_pos_l.append(initial_traj_pos)
 
         # initial_traj_pos_vel = torch.stack(traj_pos_vel_l)
-        initial_traj_pos = torch.stack(traj_pos_l)
+
+        try:
+            initial_traj_pos = torch.stack(traj_pos_l)
+        except RuntimeError:
+            breakpoint()
+            pass
+
         return initial_traj_pos

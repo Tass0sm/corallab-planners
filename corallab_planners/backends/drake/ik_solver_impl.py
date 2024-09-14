@@ -132,7 +132,8 @@ class DrakeIKSolver():
     def _add_flat_link_constraint(self, ik, link):
         link_frame = self.plant_f.GetBodyByName(link).body_frame()
 
-        z_vec = np.array([[1.0, 0.0, 0.0]]).T
+        # OLD ROBOTS: z_vec = np.array([[1.0, 0.0, 0.0]]).T
+        z_vec = np.array([[0.0, 0.0, 1.0]]).T
         ee_target_vec = np.array([[0.0, 0.0, -1.0]]).T
 
         ik.AddAngleBetweenVectorsConstraint(
@@ -147,6 +148,7 @@ class DrakeIKSolver():
             **kwargs,
     ):
         ik = InverseKinematics(plant=self.plant_f, plant_context=self.context_f)
+
         for name, pose in self.problem.goal_poses.items():
             pos = pose.position[0].flatten().cpu().numpy()
 
