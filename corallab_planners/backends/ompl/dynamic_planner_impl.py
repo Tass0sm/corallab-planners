@@ -18,6 +18,7 @@ class SpaceTimeMotionValidator(ob.MotionValidator):
     def __init__(self, si):
         super().__init__(si)
         self.si = si
+        self.discrete_motion_validator = ob.DiscreteMotionValidator(self.si)
 
     def checkMotion(self, s1, s2):
         if not self.si.isValid(s2):
@@ -35,11 +36,15 @@ class SpaceTimeMotionValidator(ob.MotionValidator):
         if (delta_pos / delta_t) > self.si.getStateSpace().getVMax():
             return False
 
+        if not self.discrete_motion_validator.checkMotion(s1, s2):
+            return False
+
         return True
 
 class SpaceTimeStateSpace(ob.SpaceTimeStateSpace):
-    # def __init__(self, state_space : StateSpace) -> None:
-    #     super().__init__(state_space)
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self.state_sampler = None
 
     def allocStateSampler(self):
         '''
@@ -59,11 +64,11 @@ class SpaceTimeStateSpace(ob.SpaceTimeStateSpace):
         self.state_sampler = state_sampler
 
 
-class DeterministicSpaceTimeStateSampler(ob.CompoundStateSampler):
-    pass
-    # def __init__(self):
-    #     breakpoint
-    #     pass
+# class DeterministicSpaceTimeStateSampler(ob.CompoundStateSampler):
+#     pass
+#     # def __init__(self):
+#     #     breakpoint
+#     #     pass
 
 
 class OMPLDynamicPlanner(PlannerInterface):
@@ -78,13 +83,16 @@ class OMPLDynamicPlanner(PlannerInterface):
             interpolate_solution: bool = True,
             interpolate_num: int = 64,
 
-            seed : int = 0,
+            seed : int = 123,
 
             # Sampler
             # ValidStateSamplerOverride = None,
             # sampler_kwargs = {},
             **kwargs
     ):
+
+        # Even though this throws an error, it still seems to provide determinism
+        ou.RNG().setSeed(seed)
 
         self.problem = problem
 
@@ -117,7 +125,7 @@ class OMPLDynamicPlanner(PlannerInterface):
         self.space.setTimeBounds(0.0, self.t_max)
         self.space.updateEpsilon()
 
-        self.space.set_state_sampler(DeterministicSpaceTimeStateSampler(self.space))
+        # self.space.set_state_sampler(DeterministicSpaceTimeStateSampler(self.space))
 
         self.ss = og.SimpleSetup(self.space)
         self.ss.setStateValidityChecker(ob.StateValidityCheckerFn(self._is_state_valid))
@@ -158,6 +166,11 @@ class OMPLDynamicPlanner(PlannerInterface):
 
         self.ss.setPlanner(self.planner)
 
+    def _start_or_goal_is_impossible(self, start, goal):
+        s_c = self.problem.check_collision(0.0, start).bool().item()
+        g_c = self.problem.check_collision(self.t_max, goal).bool().item()
+        return s_c or g_c
+
     def solve(
             self,
             start,
@@ -167,6 +180,12 @@ class OMPLDynamicPlanner(PlannerInterface):
     ):
 
         info = {}
+
+        if self._start_or_goal_is_impossible(start, goal):
+            return None, { "time": None }
+
+        self.problem.check_collision(0.0, start)
+        self.problem.check_collision(self.t_max, goal)
 
         # set the start and goal states;
         s = ob.State(self.space)

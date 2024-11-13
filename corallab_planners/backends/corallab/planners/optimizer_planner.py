@@ -51,8 +51,13 @@ class OptimizerPlanner:
 
         initial_solution, planner_info = self.initial_planner.solve(start, goal, **kwargs)
 
-        if initial_solution is None or initial_solution.nelement() == 0:
+        if initial_solution is None:
             return None, {}
+
+        # breakpoint()
+
+        # if initial_solution.size == 0:
+        #     return None, {}
 
         try:
             refined_solution, optimizer_info = self.optimizer.optimize(

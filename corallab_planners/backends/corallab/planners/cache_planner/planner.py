@@ -46,7 +46,7 @@ class CachePlanner:
 
     @property
     def name(self):
-        return f"cache_planner"
+        return f"{self.cached_planner.name}_cache"
 
     def solve(
             self,

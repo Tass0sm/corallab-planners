@@ -77,7 +77,9 @@ class CBS:
 
             transitions = list(zip(prev_state, state))
 
-            valid, info = self.problem.check_motion(transitions)
+            valid, info = self.problem.check_motion(transitions, margin=0.0)
+
+            print(valid)
 
             # if info["cost_collision_objects"]:
             #     print("Somehow found object collision?")
@@ -88,8 +90,6 @@ class CBS:
             #     break
 
             if not valid:
-                breakpoint()
-
                 idx_s = i
 
                 r_i, r_j = info["self_collision_robots"][0, 1:]
@@ -145,8 +145,8 @@ class CBS:
         start_i = subrobot_starts[robot_idx]
         goal_i = subrobot_goals[robot_idx]
 
-        # TODO: ??????
-        sol = constrained_a_star(self.problem, prm.planner_impl.planner_impl, robot_idx, start_i, goal_i, max_length, constraint_set)
+        breakpoint()
+        sol, info = self.low_level_planner.solve(start_i, goal_i, constraints=constraint_set)
 
         if isinstance(sol, list):
             sol = sol[0]
@@ -192,23 +192,19 @@ class CBS:
                     solution = current_node;
                     break;
                 else:
-                    breakpoint()
-                    solution = current_node;
-                    break;
+                    current_node = heapq.heappop(queue)
 
-                    # current_node = heapq.heappop(queue)
+                    for a_idx, a_traj, b_idx in [(k.i, k.traj_i, k.j),
+                                                 (k.j, k.traj_j, k.i)]:
+                        new_node_constraints = {Constraint(a_idx, a_traj, k.time)}
+                        new_node = HighLevelNode(
+                            copy(current_node.solutions),
+                            constraints=new_node_constraints,
+                            parent=current_node
+                        )
 
-                    # for a_idx, a_traj, b_idx in [(k.i, k.traj_i, k.j),
-                    #                              (k.j, k.traj_j, k.i)]:
-                    #     new_node_constraints = {Constraint(a_idx, a_traj, k.time)}
-                    #     new_node = HighLevelNode(
-                    #         copy(current_node.solutions),
-                    #         constraints=new_node_constraints,
-                    #         parent=current_node
-                    #     )
-
-                    #     self._attempt_replan(b_idx, new_node, start, goal)
-                    #     heapq.heappush(queue, new_node)
+                        self._attempt_replan(b_idx, new_node, start, goal)
+                        heapq.heappush(queue, new_node)
 
         if solution is None:
             return None, {}

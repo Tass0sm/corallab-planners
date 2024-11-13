@@ -1,6 +1,7 @@
-from .backend_manager import backend_manager
+from .entity import Entity
 
-class Optimizer:
+
+class Optimizer(Entity):
     def __init__(
             self,
             *args,
@@ -8,19 +9,4 @@ class Optimizer:
             from_impl=None,
             **kwargs
     ):
-        OptimizerImpl = backend_manager.get_backend_attr(
-            "OptimizerImpl",
-            backend=backend
-        )
-
-        if from_impl:
-            self.optimizer_impl = OptimizerImpl.from_impl(from_impl, *args, **kwargs)
-        else:
-            self.optimizer_impl = OptimizerImpl(*args, **kwargs)
-
-    def __getattr__(self, name):
-        if hasattr(self.optimizer_impl, name):
-            return getattr(self.optimizer_impl, name)
-        else:
-            # Default behaviour
-            raise AttributeError
+        super().__init__("OptimizerImpl", *args, backend=backend, from_impl=from_impl, **kwargs)

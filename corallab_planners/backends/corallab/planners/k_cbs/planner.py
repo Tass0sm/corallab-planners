@@ -108,7 +108,7 @@ class K_CBS:
             self,
             problem : MotionPlanningProblem = None,
             n_iters: int = 30000,
-            max_time: float = 60.,
+            max_time: float = 300.,
             merge_threshold : int = 10,
             interpolate_solution: bool = True,
             interpolate_num: int = 64,
@@ -191,8 +191,8 @@ class K_CBS:
         sols = {}
         sol_times = {}
 
-        for i, ((problem, planner), start, goal) in enumerate(zip(self.subrobot_dict.values(), separate_starts, separate_goals)):
-            sol, info = planner.solve(start, goal)
+        for i, ((problem, planner), start_i, goal_i) in enumerate(zip(self.subrobot_dict.values(), separate_starts, separate_goals)):
+            sol, info = planner.solve(start_i, goal_i)
 
             if sol is None:
                 sols[i] = None
@@ -498,9 +498,11 @@ class K_CBS:
 
                 current_node = queue[0]
 
-                print(f"NOW LOOKING AT {current_node}")
+                print(f"NOW LOOKING AT {current_node} in iteration {iteration}")
 
                 if not current_node.has_full_solution():
+                    print(f"Node is missing a solution")
+
                     current_node = heapq.heappop(queue)
                     solutions, times = self._solve_individual_problems(start, goal)
                     current_node.set_plan(solutions, times)

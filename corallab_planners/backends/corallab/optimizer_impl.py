@@ -42,7 +42,11 @@ class CorallabOptimizer(OptimizerInterface):
             guess_l = [x for x in guess]
             initial_traj_pos_vel = self._handle_guess_list(guess)
         elif isinstance(guess, np.ndarray):
-            guess = to_torch(guess, **self.tensor_args).unsqueeze(0)
+            guess = to_torch(guess, **self.tensor_args)
+
+            if guess.ndim == 2:
+                guess = guess.unsqueeze(0)
+
             guess_l = [x for x in guess]
             initial_traj_pos_vel = self._handle_guess_list(guess)
         else:
