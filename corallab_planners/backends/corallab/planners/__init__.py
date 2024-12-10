@@ -1,7 +1,6 @@
 from .optimizer_planner import *
 from .repeat_planner import *
 from .mrdrrt import *
-from .sipp_mp import *
 from .cbs_mp import *
 from .m_star_mp import *
 from .prm import *

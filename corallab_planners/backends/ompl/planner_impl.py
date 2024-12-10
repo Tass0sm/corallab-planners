@@ -38,6 +38,7 @@ class StateSpace(ob.RealVectorStateSpace):
         '''
         self.state_sampler = state_sampler
 
+
 class OMPLPlanner(PlannerInterface):
 
     def __init__(
