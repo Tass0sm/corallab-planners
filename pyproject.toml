@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "corallab-planners"
-version = "0.1.0"
+version = "0.2.0"
 description = "Common interface to many planners from many libraries."
 authors = ["Tassos Manganaris <tassos.manganaris@gmail.com>"]
 readme = "README.org"
