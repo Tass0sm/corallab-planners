@@ -6,7 +6,6 @@ from ompl import util as ou
 from ompl import base as ob
 from ompl import geometric as og
 
-from corallab_planners.multi_processing import MultiProcessor
 from ..planner_interface import PlannerInterface
 from .planner_impl import StateSpace
 
